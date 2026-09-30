@@ -2,6 +2,7 @@ package com.example.weather_realm.portal;
 
 import com.example.weather_realm.ModTags;
 import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.config.WeatherRealmConfig;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -30,9 +31,6 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
  */
 @EventBusSubscriber(modid = WeatherRealm.MODID, bus = EventBusSubscriber.Bus.GAME)
 public final class ClimatePortalHandler {
-    /** Only re-check a given shard every this many ticks. */
-    private static final long SCAN_INTERVAL_TICKS = 5L;
-
     private ClimatePortalHandler() {
     }
 
@@ -44,7 +42,9 @@ public final class ClimatePortalHandler {
         if (!(itemEntity.level() instanceof ServerLevel level)) {
             return;
         }
-        if (level.getGameTime() % SCAN_INTERVAL_TICKS != 0L) {
+        // Clamp to >= 1 to avoid a divide-by-zero in the modulo below.
+        long scanInterval = Math.max(1L, WeatherRealmConfig.PORTAL_SCAN_INTERVAL_TICKS.getAsInt());
+        if (level.getGameTime() % scanInterval != 0L) {
             return;
         }
         ItemStack stack = itemEntity.getItem();

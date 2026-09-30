@@ -1,6 +1,7 @@
 package com.example.weather_realm.network;
 
 import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.config.WeatherRealmConfig;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -38,8 +39,8 @@ public final class ModNetwork {
             }
             ServerLevel level = player.serverLevel();
             WeatherMode mode = payload.mode();
-            int clearTime = (mode == WeatherMode.CLEAR) ? 12000 : 0;
-            int weatherTime = (mode != WeatherMode.CLEAR) ? 12000 : 0;
+            int clearTime = (mode == WeatherMode.CLEAR) ? WeatherRealmConfig.WEATHER_CLEAR_TIME.getAsInt() : 0;
+            int weatherTime = (mode != WeatherMode.CLEAR) ? WeatherRealmConfig.WEATHER_RAIN_TIME.getAsInt() : 0;
             level.setWeatherParameters(clearTime, weatherTime, mode.raining(), mode.thundering());
             player.displayClientMessage(Component.translatable(mode.messageKey()).withStyle(ChatFormatting.AQUA), false);
         });

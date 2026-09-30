@@ -51,11 +51,6 @@ public final class BiomeMapExplorationState {
         return EXPLORED_CHUNKS.contains(ChunkPos.asLong(cx, cz));
     }
 
-    /** Number of chunks uncovered so far. */
-    public static int getExploredCount() {
-        return EXPLORED_CHUNKS.size();
-    }
-
     /** Wipes all exploration progress. */
     public static void clear() {
         EXPLORED_CHUNKS.clear();

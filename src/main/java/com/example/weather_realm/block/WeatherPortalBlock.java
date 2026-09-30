@@ -4,6 +4,7 @@ import javax.annotation.Nullable;
 
 import com.example.weather_realm.ModDimensions;
 import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.config.WeatherRealmConfig;
 import com.mojang.serialization.MapCodec;
 
 import net.minecraft.core.BlockPos;
@@ -102,12 +103,15 @@ public class WeatherPortalBlock extends Block implements Portal {
             ResourceLocation crystalPlainsId =
                     ResourceLocation.fromNamespaceAndPath(WeatherRealm.MODID, "crystal_plains");
             BlockPos searchCenter = new BlockPos(pos.getX(), 64, pos.getZ());
+            int searchRadius = Math.max(1, WeatherRealmConfig.PORTAL_SEARCH_RADIUS.getAsInt());
+            int horizontalStep = Math.max(1, WeatherRealmConfig.PORTAL_SEARCH_HORIZONTAL_STEP.getAsInt());
+            int verticalStep = Math.max(1, WeatherRealmConfig.PORTAL_SEARCH_VERTICAL_STEP.getAsInt());
             var closest = targetLevel.findClosestBiome3d(
                     holder -> holder.is(crystalPlainsId),
                     searchCenter,
-                    6400, // 搜索半径 400 个区块 / search radius = 400 chunks
-                    32,   // 水平步长 / horizontal step
-                    64    // 垂直步长 / vertical step
+                    searchRadius,   // 搜索半径 / search radius in blocks
+                    horizontalStep, // 水平步长 / horizontal step
+                    verticalStep    // 垂直步长 / vertical step
             );
             BlockPos targetXZ = (closest != null) ? closest.getFirst() : searchCenter;
             int targetX = targetXZ.getX();

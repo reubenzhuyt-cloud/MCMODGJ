@@ -27,7 +27,6 @@ import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
@@ -54,7 +53,6 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ButtonBlock;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.FenceBlock;
@@ -74,23 +72,16 @@ import net.minecraft.world.level.levelgen.structure.StructureType;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessorType;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
+import com.example.weather_realm.config.WeatherRealmConfig;
 import com.example.weather_realm.world.FrostVillageStructure;
 import com.example.weather_realm.world.FrostWoodProcessor;
-import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.ModContainer;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraft.client.Minecraft;
-import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.DeferredSpawnEggItem;
-import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.SimpleTier;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -126,8 +117,6 @@ public class WeatherRealm {
     // 坚冰木替换结构处理器 / Structure processor swapping spruce blocks for frost wood.
     public static final DeferredHolder<StructureProcessorType<?>, StructureProcessorType<FrostWoodProcessor>> FROST_WOOD_PROCESSOR =
             STRUCTURE_PROCESSORS.register("frost_wood_replace", () -> () -> FrostWoodProcessor.CODEC);
-
-    // (The MDK example_block / example_block_item / example_item were removed - this is now the Glacial Realm mod.)
 
     // --- Frost themed blocks ------------------------------------------------------------------
     // 冰晶花 / Frost Flower
@@ -789,9 +778,8 @@ public class WeatherRealm {
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> BLIZZARD_SNOW =
             PARTICLE_TYPES.register("blizzard_snow", () -> new SimpleParticleType(false));
 
-    // Creates a creative tab with the id "weather_realm:example_tab" for the example item, that is placed after the combat tab
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXAMPLE_TAB = CREATIVE_MODE_TABS.register("example_tab", () -> CreativeModeTab.builder()
-            .title(Component.translatable("itemGroup.weather_realm")) //The language key for the title of your CreativeModeTab
+            .title(Component.translatable("itemGroup.weather_realm"))
             .withTabsBefore(CreativeModeTabs.COMBAT)
             .icon(() -> FROST_FLOWER_ITEM.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
@@ -898,9 +886,6 @@ public class WeatherRealm {
     // The constructor for the mod class is the first code that is run when your mod is loaded.
     // FML will recognize some parameter types like IEventBus or ModContainer and pass them in automatically.
     public WeatherRealm(IEventBus modEventBus, ModContainer modContainer) {
-        // Register the commonSetup method for modloading
-        modEventBus.addListener(this::commonSetup);
-
         // Register the Deferred Register to the mod event bus so blocks get registered
         BLOCKS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so items get registered
@@ -922,54 +907,19 @@ public class WeatherRealm {
         // Register the Deferred Register to the mod event bus so block entities get registered
         BLOCK_ENTITIES.register(modEventBus);
 
-        // Register ourselves for server and other game events we are interested in.
-        // Note that this is necessary if and only if we want *this* class (WeatherRealm) to respond directly to events.
-        // Do not add this line if there are no @SubscribeEvent-annotated functions in this class, like onServerStarting() below.
-        NeoForge.EVENT_BUS.register(this);
-
         // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);
 
-        // Register our mod's ModConfigSpec so that FML can create and load the config file for us
-        modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        // Register our mod's ModConfigSpec so that FML can create and load the config files for us
+        modContainer.registerConfig(ModConfig.Type.COMMON, WeatherRealmConfig.COMMON_SPEC);
+        modContainer.registerConfig(ModConfig.Type.CLIENT, WeatherRealmConfig.CLIENT_SPEC);
     }
 
-    private void commonSetup(FMLCommonSetupEvent event) {
-        // Some common setup code
-        LOGGER.info("HELLO FROM COMMON SETUP");
-
-        if (Config.LOG_DIRT_BLOCK.getAsBoolean()) {
-            LOGGER.info("DIRT BLOCK >> {}", BuiltInRegistries.BLOCK.getKey(Blocks.DIRT));
-        }
-
-        LOGGER.info("{}{}", Config.MAGIC_NUMBER_INTRODUCTION.get(), Config.MAGIC_NUMBER.getAsInt());
-
-        Config.ITEM_STRINGS.get().forEach((item) -> LOGGER.info("ITEM >> {}", item));
-    }
-
-    // Add the example block item to the building blocks tab
+    // Add the permafrost building blocks to the building blocks tab
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
             event.accept(PERMAFROST_ITEM);
             event.accept(DEEP_PERMAFROST_ITEM);
-        }
-    }
-
-    // You can use SubscribeEvent and let the Event Bus discover methods to call
-    @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
-        // Do something when the server starts
-        LOGGER.info("HELLO from server starting");
-    }
-
-    // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
-    @EventBusSubscriber(modid = WeatherRealm.MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
-    static class ClientModEvents {
-        @SubscribeEvent
-        static void onClientSetup(FMLClientSetupEvent event) {
-            // Some client setup code
-            LOGGER.info("HELLO FROM CLIENT SETUP");
-            LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
         }
     }
 }

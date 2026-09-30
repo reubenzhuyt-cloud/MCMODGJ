@@ -2,6 +2,7 @@ package com.example.weather_realm.client;
 
 import com.example.weather_realm.WeatherRealm;
 import com.example.weather_realm.ModDimensions;
+import com.example.weather_realm.config.WeatherRealmConfig;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -32,12 +33,6 @@ public final class ClientBlizzardEffects {
     private ClientBlizzardEffects() {
     }
 
-    private static final int FLAKES_PER_TICK = 40;
-    private static final double RADIUS = 16.0;
-    private static final double HEIGHT = 12.0;
-    /** Per-tick blend step: 0.04F means ~25 ticks (~1.25s) to travel the full 0..1 range. */
-    private static final float TRANSITION_STEP = 0.04F;
-
     /** Smoothed blizzard strength in {@code [0, 1]}, interpolated towards the current biome target. */
     private static float currentBlizzardTransition = 0.0F;
 
@@ -54,12 +49,19 @@ public final class ClientBlizzardEffects {
             return;
         }
 
+        // Tuning comes from the CLIENT config; the values are clamped so a misconfigured entry can
+        // never yield a negative particle count or a negative blend step.
+        int flakesPerTick = Math.max(0, WeatherRealmConfig.BLIZZARD_FLAKES_PER_TICK.getAsInt());
+        double radius = Math.max(0.0D, WeatherRealmConfig.BLIZZARD_RADIUS.get());
+        double height = Math.max(0.0D, WeatherRealmConfig.BLIZZARD_HEIGHT.get());
+        float transitionStep = (float) Mth.clamp(WeatherRealmConfig.BLIZZARD_TRANSITION_STEP.get(), 0.0D, 1.0D);
+
         // Blizzard effects are confined to the frozen biome; the arid/scorching biomes stay dry.
         // The strength is approached smoothly so biome crossings fade rather than snap.
         boolean inBlizzard = level.getBiome(player.blockPosition())
                 .is(ResourceLocation.fromNamespaceAndPath(WeatherRealm.MODID, "crystal_plains"));
         float target = inBlizzard ? 1.0F : 0.0F;
-        currentBlizzardTransition = Mth.approach(currentBlizzardTransition, target, TRANSITION_STEP);
+        currentBlizzardTransition = Mth.approach(currentBlizzardTransition, target, transitionStep);
 
         // 1. Drive vanilla rain/snow rendering proportionally (LevelRenderer.renderSnowAndRain uses it).
         level.setRainLevel(currentBlizzardTransition);
@@ -75,12 +77,12 @@ public final class ClientBlizzardEffects {
         }
 
         // 3. Flake density follows the smoothed transition, tightly around the player & under open sky.
-        int activeFlakes = Math.round(FLAKES_PER_TICK * currentBlizzardTransition);
+        int activeFlakes = Math.round(flakesPerTick * currentBlizzardTransition);
         RandomSource random = level.random;
         for (int i = 0; i < activeFlakes; i++) {
-            double x = player.getX() + (random.nextDouble() - 0.5) * RADIUS;
-            double z = player.getZ() + (random.nextDouble() - 0.5) * RADIUS;
-            double y = player.getY() + random.nextDouble() * HEIGHT - 2.0;
+            double x = player.getX() + (random.nextDouble() - 0.5) * radius;
+            double z = player.getZ() + (random.nextDouble() - 0.5) * radius;
+            double y = player.getY() + random.nextDouble() * height - 2.0;
 
             int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z));
             if (y < surfaceY) {
