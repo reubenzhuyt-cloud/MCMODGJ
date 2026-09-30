@@ -9,11 +9,13 @@ import com.example.weather_realm.config.WeatherRealmConfig;
 import com.mojang.serialization.MapCodec;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
@@ -25,6 +27,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Portal;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.portal.DimensionTransition;
@@ -117,10 +120,30 @@ public class WeatherPortalBlock extends Block implements Portal {
             BlockPos targetXZ = (closest != null) ? closest.getFirst() : searchCenter;
             int targetX = targetXZ.getX();
             int targetZ = targetXZ.getZ();
-            int surfaceY = targetLevel.getHeight(Heightmap.Types.MOTION_BLOCKING, targetX, targetZ);
-            int landingY = Math.max(targetLevel.getMinBuildHeight() + 10, surfaceY);
+
+            // 先强制加载目标区块再取高度，并在最高方块之上扫描安全站立点。
+            // 原实现直接调用 Level#getHeight：该方法对未加载区块会返回 getMinBuildHeight()，
+            // 于是落点被夹到 minBuildHeight+10 附近的地底（见 Level.java:383-398）。
+            int landingY = findSafeLandingY(targetLevel, targetX, targetZ);
+            if (landingY == UNSAFE_LANDING) {
+                // 兜底：目标区块拿不到有效高度时，回退到该维度共享出生点并做同样的安全扫描。
+                BlockPos spawn = targetLevel.getSharedSpawnPos();
+                targetX = spawn.getX();
+                targetZ = spawn.getZ();
+                landingY = findSafeLandingY(targetLevel, targetX, targetZ);
+            }
+            if (landingY == UNSAFE_LANDING) {
+                // 极端兜底：仍无安全点，则退回到共享出生点 Y 并夹取到合法建造范围，绝不再出现世界底部落点。
+                BlockPos spawn = targetLevel.getSharedSpawnPos();
+                targetX = spawn.getX();
+                targetZ = spawn.getZ();
+                landingY = Mth.clamp(spawn.getY(),
+                        targetLevel.getMinBuildHeight() + 1,
+                        targetLevel.getMaxBuildHeight() - 2);
+            }
 
             // 落地安全保障：脚下生成 3x3 浮冰承台，清空身位 / Safe landing: 3x3 packed-ice platform.
+            // 承台方块位于 landingY - 1，玩家脚底位于 landingY，脚底严格高于承台方块。
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     BlockPos floorPos = new BlockPos(targetX + dx, landingY - 1, targetZ + dz);
@@ -142,6 +165,61 @@ public class WeatherPortalBlock extends Block implements Portal {
                 entity.getXRot(),
                 DimensionTransition.PLAY_PORTAL_SOUND.then(DimensionTransition.PLACE_PORTAL_TICKET)
         );
+    }
+
+    /** 落点安全扫描失败的哨兵值 / Sentinel for a failed safe-landing scan. */
+    private static final int UNSAFE_LANDING = Integer.MIN_VALUE;
+
+    /**
+     * 取目标 XZ 的安全落点 Y（玩家脚底）。
+     *
+     * <p>先强制加载/生成目标区块，再用该区块的高度图取“最高非树叶方块之上”的第一格；
+     * 高度图对未加载区块会退化到世界底部，因此区块必须先生成。随后在
+     * {@code [getMinBuildHeight()+1, getMaxBuildHeight()-2]} 范围内向上扫描第一个
+     * 脚底与头顶两格可站立、且脚下可承托的空位，保证玩家落在最高的方块之上。</p>
+     *
+     * @return 安全落点 Y，或 {@link #UNSAFE_LANDING}
+     */
+    private static int findSafeLandingY(ServerLevel level, int x, int z) {
+        int lower = level.getMinBuildHeight() + 1;
+        int upper = level.getMaxBuildHeight() - 2;
+        if (lower > upper) {
+            return UNSAFE_LANDING;
+        }
+
+        // 强制加载目标区块（可能触发同步生成），生成后其高度图才是权威的。
+        LevelChunk chunk = level.getChunk(
+                SectionPos.blockToSectionCoord(x),
+                SectionPos.blockToSectionCoord(z));
+
+        // MOTION_BLOCKING_NO_LEAVES 忽略树叶，避免把落点定在树冠上；+1 得到“最高方块之上”的第一格。
+        int firstFreeY = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) + 1;
+        int startY = Mth.clamp(firstFreeY, lower, upper);
+
+        for (int y = startY; y <= upper; y++) {
+            if (isSafeStandingSpot(level, x, y, z)) {
+                return y;
+            }
+        }
+        return UNSAFE_LANDING;
+    }
+
+    /** 脚底与头顶两格可替换/为空，且脚下那格可承托（固体或有碰撞体，否则会被承台填补）。 */
+    private static boolean isSafeStandingSpot(ServerLevel level, int x, int y, int z) {
+        BlockPos feet = new BlockPos(x, y, z);
+        BlockPos head = feet.above();
+        BlockPos ground = feet.below();
+
+        if (!isPassable(level.getBlockState(feet)) || !isPassable(level.getBlockState(head))) {
+            return false;
+        }
+        BlockState groundState = level.getBlockState(ground);
+        return isPassable(groundState) || !groundState.getCollisionShape(level, ground).isEmpty();
+    }
+
+    /** 空气或可被替换 / Air or replaceable. */
+    private static boolean isPassable(BlockState state) {
+        return state.isAir() || state.canBeReplaced();
     }
 
     @Override
