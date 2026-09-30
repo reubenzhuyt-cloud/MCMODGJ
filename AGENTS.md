@@ -159,7 +159,7 @@ public class PlayerMixin {
 | :- | :- | :- | :-: |
 | 已有方法内部逻辑、计算公式 | `src/main/java/**`(普通类) | `Ctrl+Shift+F9` → JBR HotSwap | **否** |
 | 新增辅助方法/字段/Lambda | 普通类 | `Ctrl+Shift+F9` → JBR HotSwap | **否** |
-| Mixin 注入逻辑(跳板外置) | `*Helper.java` / `*Manager.java` | `Ctrl+Shift+F9` → JBR HotSwap | **否** |
+| Mixin 注入逻辑(跳板外置) | `*Handler.java` / `*Helper.java` / `Mod*` 注册类(本项目无 `*Manager`) | `Ctrl+Shift+F9` → JBR HotSwap | **否** |
 | Mixin 注入点本身(`@At` 改动、增减 Mixin 类) | `**/mixin/*.java` | 无法热更 | **是** |
 | 新增方块/物品/实体/GUI 类型 | `DeferredRegister` 注册项 | 静态注册表已冻结 | **是** |
 | 新增 `@SubscribeEvent` 监听 | Mod Event Bus 监听方法 | 总线只在启动扫一次 | **是** |
@@ -230,7 +230,7 @@ public class PlayerMixin {
 - **传送方式**:`/execute in <modid>:<dim> run spreadplayers ... under 256 false @s`(指令,0 工时)、**右键道具传送(推荐)**;传送门(**禁**)。
 - **道具传送**:物品 `use` 里 `player.teleportTo(targetLevel, x, y, z, yRot, xRot)`;落点要算安全地表,别固定 y=0 或 y=300。
 - **首次使用任何 worldgen JSON 前必须**用 **Misode 1.21.1 生成器**校验:https://misode.github.io/
-- **⚠️ 素材内部冲突**:生物群系 `features` 数组,来源称"长度恰好为 10",却枚举了 11 个生成阶段(0~10),示例 JSON 又是 10 个数组。**不要凭记忆写,以 Misode 1.21.1 校验为准**。
+- **`features` 数组阶段数(本工程实测)**:三个群系 JSON 的 `features` 均为 **11 个数组**,对应生成阶段索引 **0..10**(空阶段写 `[]`)。素材中"长度恰好为 10"的说法与本仓库不符;改 worldgen 前仍建议用 Misode 1.21.1 生成器校验。
 
 ---
 
@@ -256,9 +256,10 @@ Windows 一律用 `.\gradlew.bat` 前缀。
 ### 8.1 一键构建与客户端注入工作流 (PCL 联调)
 
 - 命令:`.\deploy.ps1`(PowerShell)或 `.\deploy.bat`(cmd 用户的薄封装,等价于 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File deploy.ps1`)。
-- 流程:校验/设置 `JAVA_HOME` 为 JDK 21 → 执行 `.\gradlew.bat build`(非零退出码立即中止并透传错误码)→ 取 `build\libs\` 下最新的可部署 jar(`examplemod-*.jar`,已排除 `-sources`/`-javadoc`/`-dev` jar)→ **覆盖**复制到注入目标目录。
+- 流程:校验/设置 `JAVA_HOME` 为 JDK 21 → 执行 `.\gradlew.bat build`(非零退出码立即中止并透传错误码)→ 取 `build\libs\` 下最新的可部署 jar(`weather_realm-1.21.1-1.0.0.jar`,规则为 `<mod_id>-<minecraft_version>-<mod_version>.jar`;已排除 `-sources`/`-javadoc`/`-dev` jar)→ **覆盖**复制到注入目标目录。
 - 注入目标:`C:\Users\31087\Desktop\mc\.minecraft\versions\1.21.1-NeoForge_21.1.252\mods\`(不存在时脚本自动创建)。
 - 适用时机:用 **PCL 启动器**游玩联调、**多客户端**联机、**光影 / 渲染**等无法用 `runClient` 覆盖的场景。
+- ⚠️ **部署前必须完全退出 Minecraft 客户端**:脚本会检测目标实例是否仍有客户端进程在运行,若在运行则**拒绝部署**(防热覆盖 jar 触发 `NoClassDefFoundError`),需先完全退出后重跑;确需强制时可显式 `.\deploy.ps1 -Force`(不建议)。
 - 注意:注入后需在启动器内**重启客户端**;新增注册项不可热更(见第 6 节)。纯 Java 逻辑迭代仍优先走 IDE HotSwap。
 
 ---
@@ -308,7 +309,7 @@ Windows 一律用 `.\gradlew.bat` 前缀。
 | `mc_devlogin` 这个 Gradle 属性是否真实 | ⚠️需复核,未获官方证实 |
 | `runClientData` 任务名是否存在 | ⚠️需复核 |
 | NeoForge 是否仍认 `forge.logging.*` 系统属性 | ⚠️需复核(旧 Forge 时代做法) |
-| worldgen 的 JSON 字段全集与 `features` 阶段枚举 | ⚠️需复核,**必须用 Misode 校验** |
+| worldgen 的 JSON 字段全集与 `features` 阶段枚举 | ✅ 已实测:本工程三群系 `features` 为 **11 段(0..10)**;字段全集仍建议用 Misode 校验 |
 | `maven.neoforged.net` 在国内各地网络的实际速度 | ⚠️需复核,开工前实测 |
 | `neoForge.runs.*` DSL 字段名(`gameDirectory`、`parchment { }` 等) | ⚠️需复核,以 ModDevGradle 官方文档为准 |
 
