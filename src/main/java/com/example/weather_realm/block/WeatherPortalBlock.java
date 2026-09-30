@@ -3,6 +3,7 @@ package com.example.weather_realm.block;
 import javax.annotation.Nullable;
 
 import com.example.weather_realm.ModDimensions;
+import com.example.weather_realm.ModParticles;
 import com.example.weather_realm.WeatherRealm;
 import com.example.weather_realm.config.WeatherRealmConfig;
 import com.mojang.serialization.MapCodec;
@@ -156,7 +157,7 @@ public class WeatherPortalBlock extends Block implements Portal {
             double px = pos.getX() + random.nextDouble();
             double py = pos.getY() + random.nextDouble();
             double pz = pos.getZ() + random.nextDouble();
-            level.addParticle(WeatherRealm.BLIZZARD_SNOW.get(), px, py, pz, 0.0D, 0.04D, 0.0D);
+            level.addParticle(ModParticles.BLIZZARD_SNOW.get(), px, py, pz, 0.0D, 0.04D, 0.0D);
         }
     }
 }

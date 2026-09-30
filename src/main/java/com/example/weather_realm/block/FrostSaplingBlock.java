@@ -1,6 +1,6 @@
 package com.example.weather_realm.block;
 
-import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.ModBlocks;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -66,7 +66,7 @@ public class FrostSaplingBlock extends FrostPlantBlock implements BonemealableBl
 
         // Trunk: y = 0 .. height - 1.
         for (int y = 0; y < height; y++) {
-            level.setBlock(pos.above(y), WeatherRealm.FROST_LOG.get().defaultBlockState(), 3);
+            level.setBlock(pos.above(y), ModBlocks.FROST_LOG.get().defaultBlockState(), 3);
         }
 
         // Conical, tiered spruce canopy relative to the block just above the trunk tip.
@@ -86,7 +86,7 @@ public class FrostSaplingBlock extends FrostPlantBlock implements BonemealableBl
     private void placeLeafIfAir(ServerLevel level, BlockPos pos) {
         BlockState existing = level.getBlockState(pos);
         if (existing.isAir() || existing.canBeReplaced()) {
-            level.setBlock(pos, WeatherRealm.FROST_LEAVES.get().defaultBlockState(), 3);
+            level.setBlock(pos, ModBlocks.FROST_LEAVES.get().defaultBlockState(), 3);
         }
     }
 

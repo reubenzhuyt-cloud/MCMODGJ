@@ -1,6 +1,7 @@
 package com.example.weather_realm.block;
 
-import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.ModBlocks;
+import com.example.weather_realm.ModItems;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -52,18 +53,10 @@ public class FrostFlowerBlock extends FrostPlantBlock implements BonemealableBlo
 
     @Override
     public void performBonemeal(ServerLevel level, RandomSource random, BlockPos pos, BlockState state) {
-        // Try to duplicate onto an adjacent valid snow block.
-        for (int attempt = 0; attempt < 8; attempt++) {
-            BlockPos target = pos.offset(random.nextInt(3) - 1, random.nextInt(2) - 1, random.nextInt(3) - 1);
-            if (target.equals(pos)) {
-                continue;
-            }
-            if (canPlantAt(level, target)) {
-                level.setBlock(target, WeatherRealm.FROST_FLOWER.get().defaultBlockState(), 3);
-                return;
-            }
+        // Try to duplicate onto an adjacent valid snow block, else drop a frost flower item.
+        if (!FrostBonemeal.duplicateNearby(level, random, pos, 8, 1, 0, 1,
+                ModBlocks.FROST_FLOWER.get().defaultBlockState())) {
+            Block.popResource(level, pos, new ItemStack(ModItems.FROST_FLOWER_ITEM.get()));
         }
-        // Fallback: drop a frost flower item.
-        Block.popResource(level, pos, new ItemStack(WeatherRealm.FROST_FLOWER_ITEM.get()));
     }
 }

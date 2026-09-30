@@ -1,5 +1,6 @@
 package com.example.weather_realm.client;
 
+import com.example.weather_realm.ModBlocks;
 import com.example.weather_realm.WeatherRealm;
 import com.example.weather_realm.client.gui.WeatherControlScreen;
 
@@ -30,10 +31,10 @@ public final class WeatherAltarInteractionHandler {
             return;
         }
         BlockPos pos = event.getPos();
-        if (!level.getBlockState(pos).is(WeatherRealm.WEATHER_ALTAR_CORE.get())) {
+        if (!level.getBlockState(pos).is(ModBlocks.WEATHER_ALTAR_CORE.get())) {
             return;
         }
-        if (!level.getBlockState(pos.below()).is(WeatherRealm.WEATHER_PEDESTAL.get())) {
+        if (!level.getBlockState(pos.below()).is(ModBlocks.WEATHER_PEDESTAL.get())) {
             return;
         }
         Minecraft.getInstance().setScreen(new WeatherControlScreen());

@@ -1,5 +1,6 @@
 package com.example.weather_realm.client;
 
+import com.example.weather_realm.ModParticles;
 import com.example.weather_realm.WeatherRealm;
 import com.example.weather_realm.ModDimensions;
 import com.example.weather_realm.config.WeatherRealmConfig;
@@ -95,7 +96,7 @@ public final class ClientBlizzardEffects {
             double vx = (random.nextDouble() - 0.5) * 0.1;
             double vy = -0.2 - random.nextDouble() * 0.2;
             double vz = (random.nextDouble() - 0.5) * 0.1;
-            level.addParticle(WeatherRealm.BLIZZARD_SNOW.get(), x, y, z, vx, vy, vz);
+            level.addParticle(ModParticles.BLIZZARD_SNOW.get(), x, y, z, vx, vy, vz);
         }
     }
 }

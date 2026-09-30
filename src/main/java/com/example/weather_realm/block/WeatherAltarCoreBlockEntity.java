@@ -1,6 +1,6 @@
 package com.example.weather_realm.block;
 
-import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.ModBlockEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -17,6 +17,6 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public class WeatherAltarCoreBlockEntity extends BlockEntity {
     public WeatherAltarCoreBlockEntity(BlockPos pos, BlockState state) {
-        super(WeatherRealm.WEATHER_ALTAR_CORE_BLOCK_ENTITY.get(), pos, state);
+        super(ModBlockEntities.WEATHER_ALTAR_CORE_BLOCK_ENTITY.get(), pos, state);
     }
 }

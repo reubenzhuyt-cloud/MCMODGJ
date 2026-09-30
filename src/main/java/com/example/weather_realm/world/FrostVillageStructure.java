@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.ModStructureTypes;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -148,6 +148,6 @@ public class FrostVillageStructure extends Structure {
 
     @Override
     public StructureType<?> type() {
-        return WeatherRealm.FROST_VILLAGE_STRUCTURE.get();
+        return ModStructureTypes.FROST_VILLAGE_STRUCTURE.get();
     }
 }

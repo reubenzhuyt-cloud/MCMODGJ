@@ -1,7 +1,7 @@
 package com.example.weather_realm.entity;
 
 import com.example.weather_realm.ModEntities;
-import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.ModItems;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
@@ -37,7 +37,7 @@ public class FrostCow extends Cow {
         if (itemstack.is(Items.BUCKET) && !this.isBaby()) {
             player.playSound(SoundEvents.COW_MILK, 1.0F, 1.0F);
             ItemStack itemstack1 = ItemUtils.createFilledResult(itemstack, player,
-                    new ItemStack(WeatherRealm.FROST_MILK_BUCKET.get()));
+                    new ItemStack(ModItems.FROST_MILK_BUCKET.get()));
             player.setItemInHand(hand, itemstack1);
             return InteractionResult.sidedSuccess(this.level().isClientSide);
         } else {

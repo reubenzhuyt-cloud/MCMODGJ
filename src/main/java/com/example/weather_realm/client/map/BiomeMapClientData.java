@@ -2,6 +2,7 @@ package com.example.weather_realm.client.map;
 
 import java.util.Arrays;
 
+import com.example.weather_realm.ModItems;
 import com.example.weather_realm.WeatherRealm;
 import com.example.weather_realm.item.BiomeMapItem;
 
@@ -143,8 +144,8 @@ public final class BiomeMapClientData {
 
     private static void refreshIfNeeded(Minecraft minecraft, ClientLevel level, LocalPlayer player,
                                         MapItemSavedData saved) {
-        boolean holding = player.getMainHandItem().is(WeatherRealm.BIOME_MAP.get())
-                || player.getOffhandItem().is(WeatherRealm.BIOME_MAP.get());
+        boolean holding = player.getMainHandItem().is(ModItems.BIOME_MAP.get())
+                || player.getOffhandItem().is(ModItems.BIOME_MAP.get());
         if (!holding) {
             lastRefreshWasActive = false;
             return;

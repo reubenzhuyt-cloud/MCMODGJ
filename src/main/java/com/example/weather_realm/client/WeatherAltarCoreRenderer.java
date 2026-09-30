@@ -1,5 +1,6 @@
 package com.example.weather_realm.client;
 
+import com.example.weather_realm.ModParticles;
 import com.example.weather_realm.WeatherRealm;
 import com.example.weather_realm.block.WeatherAltarCoreBlockEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -79,7 +80,7 @@ public class WeatherAltarCoreRenderer implements BlockEntityRenderer<WeatherAlta
         double centerZ = blockEntity.getBlockPos().getZ() + 0.5D;
         double angle = random.nextDouble() * Math.PI * 2.0D;
         double radius = 0.75D;
-        level.addParticle(WeatherRealm.BLIZZARD_SNOW.get(),
+        level.addParticle(ModParticles.BLIZZARD_SNOW.get(),
                 centerX + Math.cos(angle) * radius,
                 centerY + (random.nextDouble() - 0.5D) * 0.8D,
                 centerZ + Math.sin(angle) * radius,

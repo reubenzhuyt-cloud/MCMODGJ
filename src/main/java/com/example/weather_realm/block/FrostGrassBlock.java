@@ -1,6 +1,6 @@
 package com.example.weather_realm.block;
 
-import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.ModBlocks;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -50,18 +50,8 @@ public class FrostGrassBlock extends FrostPlantBlock implements BonemealableBloc
     @Override
     public void performBonemeal(ServerLevel level, RandomSource random, BlockPos pos, BlockState state) {
         // Spread frost_grass / frost_flower over a 5x5 (radius 2) area.
-        for (int attempt = 0; attempt < 48; attempt++) {
-            BlockPos target = pos.offset(
-                    random.nextInt(5) - 2,
-                    random.nextInt(3) - 1,
-                    random.nextInt(5) - 2);
-            if (!canPlantAt(level, target)) {
-                continue;
-            }
-            BlockState plant = random.nextInt(6) == 0
-                    ? WeatherRealm.FROST_FLOWER.get().defaultBlockState()
-                    : WeatherRealm.FROST_GRASS.get().defaultBlockState();
-            level.setBlock(target, plant, 3);
-        }
+        FrostBonemeal.spreadArea(level, random, pos, 48, 2, 1, 1, 1, 6,
+                ModBlocks.FROST_GRASS.get().defaultBlockState(),
+                ModBlocks.FROST_FLOWER.get().defaultBlockState());
     }
 }

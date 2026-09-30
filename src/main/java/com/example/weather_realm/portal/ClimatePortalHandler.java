@@ -1,5 +1,8 @@
 package com.example.weather_realm.portal;
 
+import com.example.weather_realm.ModBlocks;
+import com.example.weather_realm.ModItems;
+import com.example.weather_realm.ModParticles;
 import com.example.weather_realm.ModTags;
 import com.example.weather_realm.WeatherRealm;
 import com.example.weather_realm.config.WeatherRealmConfig;
@@ -48,7 +51,7 @@ public final class ClimatePortalHandler {
             return;
         }
         ItemStack stack = itemEntity.getItem();
-        if (!stack.is(WeatherRealm.CLIMATE_SHARD.get())) {
+        if (!stack.is(ModItems.CLIMATE_SHARD.get())) {
             return;
         }
         tryActivate(level, itemEntity, stack);
@@ -120,7 +123,7 @@ public final class ClimatePortalHandler {
             itemEntity.setItem(stack);
         }
 
-        BlockState portal = WeatherRealm.WEATHER_PORTAL.get().defaultBlockState();
+        BlockState portal = ModBlocks.WEATHER_PORTAL.get().defaultBlockState();
         for (int dx = 0; dx <= 1; dx++) {
             for (int dz = 0; dz <= 1; dz++) {
                 level.setBlock(anchor.offset(dx, 0, dz), portal, 3);
@@ -147,7 +150,7 @@ public final class ClimatePortalHandler {
                     4, 0.25D, 0.0D, 0.25D, 0.02D);
         }
         for (int i = 0; i < 24; i++) {
-            level.sendParticles(WeatherRealm.BLIZZARD_SNOW.get(),
+            level.sendParticles(ModParticles.BLIZZARD_SNOW.get(),
                     centerX + (level.getRandom().nextDouble() - 0.5D) * 3.0D,
                     centerY + level.getRandom().nextDouble() * 2.0D,
                     centerZ + (level.getRandom().nextDouble() - 0.5D) * 3.0D,

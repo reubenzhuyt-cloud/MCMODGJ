@@ -7,6 +7,7 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.ModBlocks;
 import com.example.weather_realm.ModEntities;
 
 import net.minecraft.core.BlockPos;
@@ -63,7 +64,7 @@ public class FrostSheep extends Sheep {
             this.setSheared(true);
             int count = 1 + this.random.nextInt(3);
             for (int i = 0; i < count; i++) {
-                ItemEntity drop = this.spawnAtLocation(new ItemStack(WeatherRealm.FROST_WOOL.get()), 1.0F);
+                ItemEntity drop = this.spawnAtLocation(new ItemStack(ModBlocks.FROST_WOOL.get()), 1.0F);
                 if (drop != null) {
                     drop.setDeltaMovement(drop.getDeltaMovement().add(
                             (this.random.nextFloat() - this.random.nextFloat()) * 0.1F,

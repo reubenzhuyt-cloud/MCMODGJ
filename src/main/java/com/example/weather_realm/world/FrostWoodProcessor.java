@@ -2,6 +2,7 @@ package com.example.weather_realm.world;
 
 import java.util.Map;
 
+import com.example.weather_realm.ModStructureTypes;
 import com.example.weather_realm.WeatherRealm;
 import com.mojang.serialization.MapCodec;
 
@@ -33,7 +34,7 @@ public class FrostWoodProcessor extends StructureProcessor {
 
     @Override
     protected StructureProcessorType<?> getType() {
-        return WeatherRealm.FROST_WOOD_PROCESSOR.get();
+        return ModStructureTypes.FROST_WOOD_PROCESSOR.get();
     }
 
     @Override

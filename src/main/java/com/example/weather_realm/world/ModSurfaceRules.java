@@ -3,6 +3,7 @@ package com.example.weather_realm.world;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.example.weather_realm.ModBlocks;
 import com.example.weather_realm.WeatherRealm;
 
 import net.minecraft.core.registries.Registries;
@@ -105,7 +106,7 @@ public final class ModSurfaceRules {
     /**
      * Lazily builds and memoises the three-biome rule group. First construction happens during
      * worldgen, after the deferred registers have been populated, so dereferencing
-     * {@code WeatherRealm.*.get()} here can never observe a not-yet-created holder (doing it in a
+     * {@code ModBlocks.*.get()} here can never observe a not-yet-created holder (doing it in a
      * static field initialiser would risk exactly that).
      */
     private static SurfaceRules.RuleSource modRules() {
@@ -142,12 +143,12 @@ public final class ModSurfaceRules {
                                 // 表层草皮:仅在初步地表之上,避免洞口/山体内部地板被草皮覆盖
                                 SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
                                         SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
-                                                SurfaceRules.state(WeatherRealm.FROST_MOSS.get().defaultBlockState()))),
+                                                SurfaceRules.state(ModBlocks.FROST_MOSS.get().defaultBlockState()))),
                                 // 浅层岩 / 深层岩:保持整柱替换
                                 SurfaceRules.ifTrue(ABOVE_ZERO,
-                                        SurfaceRules.state(WeatherRealm.PERMAFROST.get().defaultBlockState())),
+                                        SurfaceRules.state(ModBlocks.PERMAFROST.get().defaultBlockState())),
                                 SurfaceRules.ifTrue(BELOW_ZERO,
-                                        SurfaceRules.state(WeatherRealm.DEEP_PERMAFROST.get().defaultBlockState())))));
+                                        SurfaceRules.state(ModBlocks.DEEP_PERMAFROST.get().defaultBlockState())))));
     }
 
     /**
@@ -162,12 +163,12 @@ public final class ModSurfaceRules {
                                 // 表层火山灰:仅在初步地表之上,避免洞口/山体内部地板被覆盖
                                 SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
                                         SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
-                                                SurfaceRules.state(WeatherRealm.VOLCANIC_ASH.get().defaultBlockState()))),
+                                                SurfaceRules.state(ModBlocks.VOLCANIC_ASH.get().defaultBlockState()))),
                                 // 浅层岩 / 深层岩:保持整柱替换
                                 SurfaceRules.ifTrue(ABOVE_ZERO,
-                                        SurfaceRules.state(WeatherRealm.FIRE_STONE.get().defaultBlockState())),
+                                        SurfaceRules.state(ModBlocks.FIRE_STONE.get().defaultBlockState())),
                                 SurfaceRules.ifTrue(BELOW_ZERO,
-                                        SurfaceRules.state(WeatherRealm.DEEP_FIRE_STONE.get().defaultBlockState())))));
+                                        SurfaceRules.state(ModBlocks.DEEP_FIRE_STONE.get().defaultBlockState())))));
     }
 
     /**
@@ -182,11 +183,11 @@ public final class ModSurfaceRules {
                                 // 表层干草坪:仅在初步地表之上,避免洞口/山体内部地板被覆盖
                                 SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
                                         SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
-                                                SurfaceRules.state(WeatherRealm.DRY_TURF.get().defaultBlockState()))),
+                                                SurfaceRules.state(ModBlocks.DRY_TURF.get().defaultBlockState()))),
                                 // 浅层岩 / 深层岩:保持整柱替换
                                 SurfaceRules.ifTrue(ABOVE_ZERO,
-                                        SurfaceRules.state(WeatherRealm.WEATHERED_SANDSTONE.get().defaultBlockState())),
+                                        SurfaceRules.state(ModBlocks.WEATHERED_SANDSTONE.get().defaultBlockState())),
                                 SurfaceRules.ifTrue(BELOW_ZERO,
-                                        SurfaceRules.state(WeatherRealm.DEEP_WEATHERED_SANDSTONE.get().defaultBlockState())))));
+                                        SurfaceRules.state(ModBlocks.DEEP_WEATHERED_SANDSTONE.get().defaultBlockState())))));
     }
 }

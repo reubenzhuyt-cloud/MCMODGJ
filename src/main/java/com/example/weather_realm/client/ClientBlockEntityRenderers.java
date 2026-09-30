@@ -1,5 +1,6 @@
 package com.example.weather_realm.client;
 
+import com.example.weather_realm.ModBlockEntities;
 import com.example.weather_realm.WeatherRealm;
 
 import net.minecraft.client.resources.model.ModelResourceLocation;
@@ -18,7 +19,7 @@ import net.neoforged.neoforge.client.event.ModelEvent;
 public class ClientBlockEntityRenderers {
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
-        event.registerBlockEntityRenderer(WeatherRealm.WEATHER_ALTAR_CORE_BLOCK_ENTITY.get(), WeatherAltarCoreRenderer::new);
+        event.registerBlockEntityRenderer(ModBlockEntities.WEATHER_ALTAR_CORE_BLOCK_ENTITY.get(), WeatherAltarCoreRenderer::new);
     }
 
     @SubscribeEvent

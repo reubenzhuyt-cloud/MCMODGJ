@@ -1,6 +1,6 @@
 package com.example.weather_realm.block;
 
-import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.ModBlocks;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
@@ -30,8 +30,8 @@ public class GlacierBloomBlock extends FlowerBlock {
     @Override
     protected boolean mayPlaceOn(BlockState state, BlockGetter level, BlockPos pos) {
         return state.is(BlockTags.DIRT)
-                || state.is(WeatherRealm.PERMAFROST.get())
-                || state.is(WeatherRealm.DEEP_PERMAFROST.get())
+                || state.is(ModBlocks.PERMAFROST.get())
+                || state.is(ModBlocks.DEEP_PERMAFROST.get())
                 || FrostPlantBlock.isFrostPlantable(state);
     }
 }

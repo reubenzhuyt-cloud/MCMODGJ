@@ -1,5 +1,6 @@
 package com.example.weather_realm.client;
 
+import com.example.weather_realm.ModParticles;
 import com.example.weather_realm.WeatherRealm;
 
 import net.neoforged.api.distmarker.Dist;
@@ -18,6 +19,6 @@ public final class ClientParticleProviders {
 
     @SubscribeEvent
     public static void onRegisterParticleProviders(RegisterParticleProvidersEvent event) {
-        event.registerSpriteSet(WeatherRealm.BLIZZARD_SNOW.get(), BlizzardSnowParticle.Provider::new);
+        event.registerSpriteSet(ModParticles.BLIZZARD_SNOW.get(), BlizzardSnowParticle.Provider::new);
     }
 }

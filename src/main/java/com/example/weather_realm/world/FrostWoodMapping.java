@@ -2,7 +2,7 @@ package com.example.weather_realm.world;
 
 import java.util.Map;
 
-import com.example.weather_realm.WeatherRealm;
+import com.example.weather_realm.ModBlocks;
 import com.google.common.collect.ImmutableMap;
 
 import net.minecraft.world.level.block.Block;
@@ -52,19 +52,19 @@ public final class FrostWoodMapping {
                 current = mapping;
                 if (current == null) {
                     ImmutableMap.Builder<Block, Block> builder = ImmutableMap.builder();
-                    builder.put(Blocks.SPRUCE_LOG, WeatherRealm.FROST_LOG.get());
-                    builder.put(Blocks.SPRUCE_WOOD, WeatherRealm.FROST_WOOD.get());
-                    builder.put(Blocks.STRIPPED_SPRUCE_LOG, WeatherRealm.STRIPPED_FROST_LOG.get());
-                    builder.put(Blocks.STRIPPED_SPRUCE_WOOD, WeatherRealm.STRIPPED_FROST_WOOD.get());
-                    builder.put(Blocks.SPRUCE_PLANKS, WeatherRealm.FROST_PLANKS.get());
-                    builder.put(Blocks.SPRUCE_STAIRS, WeatherRealm.FROST_STAIRS.get());
-                    builder.put(Blocks.SPRUCE_SLAB, WeatherRealm.FROST_SLAB.get());
-                    builder.put(Blocks.SPRUCE_FENCE, WeatherRealm.FROST_FENCE.get());
-                    builder.put(Blocks.SPRUCE_FENCE_GATE, WeatherRealm.FROST_FENCE_GATE.get());
-                    builder.put(Blocks.SPRUCE_DOOR, WeatherRealm.FROST_DOOR.get());
-                    builder.put(Blocks.SPRUCE_TRAPDOOR, WeatherRealm.FROST_TRAPDOOR.get());
-                    builder.put(Blocks.SPRUCE_PRESSURE_PLATE, WeatherRealm.FROST_PRESSURE_PLATE.get());
-                    builder.put(Blocks.SPRUCE_BUTTON, WeatherRealm.FROST_BUTTON.get());
+                    builder.put(Blocks.SPRUCE_LOG, ModBlocks.FROST_LOG.get());
+                    builder.put(Blocks.SPRUCE_WOOD, ModBlocks.FROST_WOOD.get());
+                    builder.put(Blocks.STRIPPED_SPRUCE_LOG, ModBlocks.STRIPPED_FROST_LOG.get());
+                    builder.put(Blocks.STRIPPED_SPRUCE_WOOD, ModBlocks.STRIPPED_FROST_WOOD.get());
+                    builder.put(Blocks.SPRUCE_PLANKS, ModBlocks.FROST_PLANKS.get());
+                    builder.put(Blocks.SPRUCE_STAIRS, ModBlocks.FROST_STAIRS.get());
+                    builder.put(Blocks.SPRUCE_SLAB, ModBlocks.FROST_SLAB.get());
+                    builder.put(Blocks.SPRUCE_FENCE, ModBlocks.FROST_FENCE.get());
+                    builder.put(Blocks.SPRUCE_FENCE_GATE, ModBlocks.FROST_FENCE_GATE.get());
+                    builder.put(Blocks.SPRUCE_DOOR, ModBlocks.FROST_DOOR.get());
+                    builder.put(Blocks.SPRUCE_TRAPDOOR, ModBlocks.FROST_TRAPDOOR.get());
+                    builder.put(Blocks.SPRUCE_PRESSURE_PLATE, ModBlocks.FROST_PRESSURE_PLATE.get());
+                    builder.put(Blocks.SPRUCE_BUTTON, ModBlocks.FROST_BUTTON.get());
                     current = builder.build();
                     mapping = current;
                 }
