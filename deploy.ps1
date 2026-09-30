@@ -7,10 +7,13 @@
        standard Temurin/JBR install path).
     2. Runs .\gradlew.bat build; aborts with the build exit code on failure.
     3. Refuses to deploy while a Minecraft client for the target instance is
-       still running. Hot-overwriting the mod jar under a live client makes
-       NeoForge fail to resolve new/changed classes and crash with
-       java.lang.NoClassDefFoundError (e.g. ModTags$Blocks). Use -Force to
-       bypass this guard explicitly.
+       still running. Detection uses client command-line fingerprints
+       (bootstraplauncher / cpw.mods / net.neoforged / --username / the target
+       instance dir) and explicitly ignores Gradle daemon/worker JVMs, which
+       are always alive right after the build step. Hot-overwriting the mod jar
+       under a live client makes NeoForge fail to resolve new/changed classes
+       and crash with java.lang.NoClassDefFoundError (e.g. ModTags$Blocks).
+       Use -Force to bypass this guard explicitly.
     4. Picks the newest deployable jar in build\libs\. The archive is named
        "<mod_id>-<minecraft_version>-<mod_version>.jar" (see build.gradle
        "base { archivesName = \"${mod_id}-${minecraft_version}\" }"), i.e.
@@ -108,29 +111,71 @@ function Get-JavaProcesses {
     }
 }
 
-function Test-CommandLineMatchesGame {
-    param([string]$CommandLine, [string[]]$Markers)
+# Gradle's own JVMs (daemon / build workers / launcher jars). deploy.ps1 runs
+# `.\gradlew.bat build` a few lines above, so a GradleDaemon java.exe is
+# essentially guaranteed to be alive at this point. Matching "any java.exe"
+# would therefore fire a false "client is running" warning on every run and
+# train people to ignore the guard -- so Gradle JVMs are explicitly excluded.
+function Test-IsGradleProcess {
+    param([string]$CommandLine)
     if ([string]::IsNullOrWhiteSpace($CommandLine)) { return $false }
-    foreach ($marker in $Markers) {
-        if ([string]::IsNullOrWhiteSpace($marker)) { continue }
-        if ($CommandLine.IndexOf($marker, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { return $true }
-    }
+    # Covers: org.gradle.launcher.daemon.bootstrap.GradleDaemon,
+    # gradle-daemon-main-<ver>.jar, GradleWorkerMain, and any gradle-<ver>.jar
+    # placed on the launcher classpath by the Gradle wrapper.
+    return ($CommandLine -match '(?i)(GradleDaemon|GradleWorkerMain|gradle-daemon-main|org\.gradle\.(launcher|process|internal)|[\\/]gradle-[0-9][^\\/]*\.jar)')
+}
+
+# True only for a real Minecraft *client* process, decided from the command
+# line (case-insensitive). Deliberately conservative: unrelated Java processes
+# (Gradle daemon, javac, ...) must not be reported as the client.
+function Test-CommandLineIsMinecraftClient {
+    param([string]$CommandLine)
+    if ([string]::IsNullOrWhiteSpace($CommandLine)) { return $false }
+
+    # Never treat Gradle's JVMs as the game client.
+    if (Test-IsGradleProcess -CommandLine $CommandLine) { return $false }
+
+    # Fingerprints (any one is sufficient):
+    #  A. NeoForge / ModLauncher bootstrap chain: a 1.21.1 NeoForge client is
+    #     launched through Bootstraplauncher and references cpw.mods /
+    #     net.neoforged classes (version id e.g. 1.21.1-NeoForge_21.1.252).
+    #     The bare token "neoforge" is intentionally NOT used: it also appears
+    #     on ordinary javac/Gradle compile classpaths (e.g. neoforge.jar) and
+    #     would produce false positives.
+    #  B. The vanilla client entry point, or the offline dev launch argument
+    #     --username combined with -Djava.net.preferIPv4Stack.
+    #  C. The working directory / -Duser.dir pointing at the target instance.
+    if ($CommandLine -match '(?i)(bootstraplauncher|cpw\.mods|net\.neoforged)') { return $true }
+
+    $isGameEntry = $CommandLine -match '(?i)net\.minecraft\.client\.main\.Main'
+    $hasUsername = $CommandLine -match '(?i)--username'
+    $hasIPv4Flag = $CommandLine -match '(?i)-Djava\.net\.preferIPv4Stack'
+    if ($isGameEntry -or ($hasUsername -and $hasIPv4Flag)) { return $true }
+
+    if (-not [string]::IsNullOrWhiteSpace($gameIdentity) -and
+        $CommandLine.IndexOf($gameIdentity, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { return $true }
+    if (-not [string]::IsNullOrWhiteSpace($gameRoot) -and
+        $CommandLine.IndexOf($gameRoot, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { return $true }
+
     return $false
 }
 
 if ($Force) {
     Write-Host "[deploy] WARN: -Force 已指定,跳过运行中客户端检测。" -ForegroundColor Yellow
 } else {
-    $markers   = @($gameIdentity, $gameRoot, '.minecraft')
-    $javaProcs = @(Get-JavaProcesses)
-    $blocked   = @()
-    $warned    = @()
+    $javaProcs  = @(Get-JavaProcesses)
+    $blocked    = @()
+    $unverified = @()
     foreach ($p in $javaProcs) {
-        if ($p.HasCommandLine -and (Test-CommandLineMatchesGame -CommandLine $p.CommandLine -Markers $markers)) {
+        if (-not $p.HasCommandLine) {
+            # Command line unavailable (Get-CimInstance fallback): cannot
+            # classify, so warn instead of silently guessing.
+            $unverified += $p
+        } elseif (Test-CommandLineIsMinecraftClient -CommandLine $p.CommandLine) {
             $blocked += $p
-        } else {
-            $warned += $p
         }
+        # Everything else (Gradle daemon/workers, javac, ...) is expected right
+        # after the build step and is intentionally ignored: it is not the client.
     }
     if ($blocked.Count -gt 0) {
         Write-Host ""
@@ -147,8 +192,8 @@ if ($Force) {
         Write-Host ""
         exit 1
     }
-    foreach ($p in $warned) {
-        Write-Host ("[deploy] WARN: 检测到 Java 进程 PID {0} ({1});如正在运行 Minecraft 请先完全退出。" -f $p.ProcessId, $p.Name) -ForegroundColor Yellow
+    foreach ($p in $unverified) {
+        Write-Host ("[deploy] WARN: 无法读取 Java 进程 PID {0} ({1}) 的命令行,无法确认其是否为 Minecraft 客户端;如正在运行 Minecraft 请先完全退出。" -f $p.ProcessId, $p.Name) -ForegroundColor Yellow
     }
 }
 
