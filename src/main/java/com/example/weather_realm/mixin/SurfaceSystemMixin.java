@@ -16,6 +16,6 @@ public abstract class SurfaceSystemMixin {
         ordinal = 0
     )
     private SurfaceRules.RuleSource weather_realm$injectModSurfaceRules(SurfaceRules.RuleSource original) {
-        return ModSurfaceRules.wrapOverworld(original);
+        return ModSurfaceRules.wrapSurfaceRules(original);
     }
 }

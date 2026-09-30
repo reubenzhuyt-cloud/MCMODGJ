@@ -1,5 +1,5 @@
 {
-  "itemGroup.weather_realm": "Glacial Realm",
+  "itemGroup.weather_realm": "Weather Realm",
   "biome.weather_realm.crystal_plains": "Crystal Plains",
   "biome.weather_realm.blazing_plains": "Blazing Plains",
   "biome.weather_realm.arid_wasteland": "Arid Wasteland",
@@ -90,7 +90,7 @@
   "item.weather_realm.biome_map": "Climate Biome Map",
   "item.weather_realm.biome_map.desc": "A parchment star-chart revealing the four great climate realms",
   "music.weather_realm.crystal_plains": "Crystal Plains",
-  "message.weather_realm.portal.no_dimension": "The storm gate leads nowhere... the Glacial Realm is missing.",
+  "message.weather_realm.portal.no_dimension": "The storm gate leads nowhere... the Weather Realm is missing.",
   "message.weather_realm.biome_map.wrong_dimension": "§b[Climate Map]§r This astrolabe only resonates within the Crystal Realm...",
   "message.weather_realm.biome_map.zoom": "§b[Constellation Compass] Zoom: %s blocks (%s chunks/pixel)",
   "message.weather_realm.tome.fallback_hint": "Ancient Weather Tome (Patchouli not installed - showing a brief summary):",

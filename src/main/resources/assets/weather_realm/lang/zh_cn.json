@@ -1,5 +1,5 @@
 {
-  "itemGroup.weather_realm": "极寒之境",
+  "itemGroup.weather_realm": "天象之境",
   "biome.weather_realm.crystal_plains": "水晶平原",
   "biome.weather_realm.blazing_plains": "烈焰平原",
   "biome.weather_realm.arid_wasteland": "干旱荒原",
@@ -90,8 +90,8 @@
   "item.weather_realm.biome_map": "极域天象图",
   "item.weather_realm.biome_map.desc": "羊皮纸星盘图卷，揭示四方天候极域的宏图",
   "music.weather_realm.crystal_plains": "水晶平原",
-  "message.weather_realm.portal.no_dimension": "风暴之门不通往任何地方……极寒之境缺失了。",
-  "message.weather_realm.biome_map.wrong_dimension": "§b[天象图卷]§r 此图卷仅在极寒之境能感应四象微鸣...",
+  "message.weather_realm.portal.no_dimension": "风暴之门不通往任何地方……天象之境缺失了。",
+  "message.weather_realm.biome_map.wrong_dimension": "§b[天象图卷]§r 此图卷仅在天象之境能感应四象微鸣...",
   "message.weather_realm.biome_map.zoom": "§b[天象罗盘] 视野缩放: %s 格 (%s 区块/像素)",
   "message.weather_realm.tome.fallback_hint": "《古代天气研究手记》（未安装 Patchouli，显示简要摘要）：",
   "message.weather_realm.tome.prologue": "天候纪元 34年·天旱与初遇：百年大旱里，老炼金术士第一次从雷云中凝出晶核。",

@@ -1,4 +1,4 @@
-# 天气冒险维度模组 —— 架构文档（Weather Realm / 极寒之境）
+# 天气冒险维度模组 —— 架构文档（Weather Realm / 天象之境）
 
 > **文档性质**：根目录架构总览 + 实现现状归档。描述**当前工程全貌**（以 `src/main/` 产物为准）。
 > **命名空间**：全篇统一为 `weather_realm`。
@@ -28,10 +28,10 @@
 
 | 维度 | 内容 |
 | :- | :- |
-| 项目代号 | **Weather Realm / 极寒之境** |
+| 项目代号 | **Weather Realm / 天象之境** |
 | ModID（命名空间） | `weather_realm` |
 | 主类 | `com.example.weather_realm.WeatherRealm`（`@Mod(WeatherRealm.MODID)`） |
-| 显示名 | `Glacial Realm`（en_us）/ `极寒之境`（zh_cn） |
+| 显示名 | `Weather Realm`（en_us）/ `天象之境`（zh_cn） |
 | mod 版本 | `1.0.0` |
 | 类型 | Game Jam 天气主题**冒险维度**模组 |
 

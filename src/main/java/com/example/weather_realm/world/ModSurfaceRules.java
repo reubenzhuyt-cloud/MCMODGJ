@@ -1,5 +1,8 @@
 package com.example.weather_realm.world;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import com.example.weather_realm.WeatherRealm;
 
 import net.minecraft.core.registries.Registries;
@@ -14,7 +17,7 @@ import net.minecraft.world.level.levelgen.VerticalAnchor;
  * Glacial Realm's climate biomes gets its own surface material.
  *
  * <p>Business logic lives here (not in the mixin) so it can be hot-swapped; the mixin only
- * delegates to {@link #wrapOverworld(SurfaceRules.RuleSource)}.</p>
+ * delegates to {@link #wrapSurfaceRules(SurfaceRules.RuleSource)}.</p>
  *
  * <p><b>Full-column stone replacement</b>: the old {@code ON_FLOOR}/{@code UNDER_FLOOR} depth limits
  * have been removed on purpose for the stone layers. For every stone block the surface system visits
@@ -69,11 +72,54 @@ public final class ModSurfaceRules {
     private static final SurfaceRules.ConditionSource BELOW_ZERO = SurfaceRules.not(ABOVE_ZERO);
 
     /**
+     * Memoised {@code original -> prepended} rule trees, keyed by the identity of the incoming rule
+     * source. Vanilla passes the very same {@link SurfaceRules.RuleSource} instance for every chunk
+     * of a dimension (it is held by the noise generator settings), so without this cache the tree
+     * would be rebuilt for every single column.
+     */
+    private static final Map<SurfaceRules.RuleSource, SurfaceRules.RuleSource> WRAPPED_RULES =
+            new ConcurrentHashMap<>();
+
+    /** The three-biome rule group, built lazily on first worldgen use. */
+    private static volatile SurfaceRules.RuleSource MOD_RULES;
+
+    /**
      * Prepends the mod's per-biome surface rules to the original (vanilla overworld) rules, so mod
      * rules win when their biome condition matches and vanilla rules handle everything else.
+     *
+     * <p>The result is memoised per incoming rule source, and the three-biome group itself is built
+     * only once. Vanilla invokes the surface builder for every chunk (and every column), so this
+     * keeps the rule-tree construction off the worldgen hot path.</p>
      */
-    public static SurfaceRules.RuleSource wrapOverworld(SurfaceRules.RuleSource original) {
-        return SurfaceRules.sequence(createModRules(), original);
+    public static SurfaceRules.RuleSource wrapSurfaceRules(SurfaceRules.RuleSource original) {
+        if (original == null) {
+            return modRules();
+        }
+        return WRAPPED_RULES.computeIfAbsent(original, ModSurfaceRules::prependModRules);
+    }
+
+    private static SurfaceRules.RuleSource prependModRules(SurfaceRules.RuleSource original) {
+        return SurfaceRules.sequence(modRules(), original);
+    }
+
+    /**
+     * Lazily builds and memoises the three-biome rule group. First construction happens during
+     * worldgen, after the deferred registers have been populated, so dereferencing
+     * {@code WeatherRealm.*.get()} here can never observe a not-yet-created holder (doing it in a
+     * static field initialiser would risk exactly that).
+     */
+    private static SurfaceRules.RuleSource modRules() {
+        SurfaceRules.RuleSource rules = MOD_RULES;
+        if (rules == null) {
+            synchronized (ModSurfaceRules.class) {
+                rules = MOD_RULES;
+                if (rules == null) {
+                    rules = createModRules();
+                    MOD_RULES = rules;
+                }
+            }
+        }
+        return rules;
     }
 
     private static SurfaceRules.RuleSource createModRules() {

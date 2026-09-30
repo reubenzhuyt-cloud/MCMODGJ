@@ -1,5 +1,7 @@
 package com.example.weather_realm.client.map;
 
+import java.util.Arrays;
+
 import com.example.weather_realm.WeatherRealm;
 import com.example.weather_realm.item.BiomeMapItem;
 
@@ -42,7 +44,6 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 public final class BiomeMapClientData {
     private static final int SIZE = 128;
     private static final int HALF = SIZE / 2;
-    private static final int EXPLORE_RADIUS_CHUNKS = 20;
     private static final int MAX_IDLE_TICKS = 100;
     private static final String PLAYER_DECORATION_ID = "player";
 
@@ -66,10 +67,20 @@ public final class BiomeMapClientData {
     private static int lastTier = -1;
     private static boolean lastRefreshWasActive;
 
+    /**
+     * 每像素上一次成功采样到的颜色 / Last successfully sampled colour per pixel. Used when an
+     * already-explored chunk has been unloaded: the biome query would otherwise fall back to the
+     * empty-chunk biome and paint the region {@link #UNKNOWN_COLOR} (stone grey), greying out
+     * terrain the player has already uncovered. Initialised to fog so a never-sampled pixel stays
+     * hidden.
+     */
+    private static final byte[] CACHED_COLORS = new byte[SIZE * SIZE];
+
     private BiomeMapClientData() {
     }
 
     static {
+        Arrays.fill(CACHED_COLORS, FOG_COLOR);
         // Loading this class (NeoForge scans it for @EventBusSubscriber at client startup) installs
         // the provider that BiomeMapItem.getCustomMapData consults - without any common->client ref.
         BiomeMapItem.setClientMapDataProvider(BiomeMapClientData::instance);
@@ -87,6 +98,7 @@ public final class BiomeMapClientData {
             lastPixelX = Integer.MIN_VALUE;
             lastPixelZ = Integer.MIN_VALUE;
             lastTier = -1;
+            Arrays.fill(CACHED_COLORS, FOG_COLOR);
         }
         return data;
     }
@@ -104,11 +116,18 @@ public final class BiomeMapClientData {
     }
 
     /**
-     * 登出时清空探索迷雾 / Wipes the client exploration fog when leaving a world so progress never
-     * leaks across saves.
+     * 登出时清空探索迷雾与所有客户端状态 / Wipes the client exploration fog and every cached bit of
+     * map state when leaving a world so progress never leaks across saves.
      */
     @SubscribeEvent
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        data = null;
+        lastPixelX = Integer.MIN_VALUE;
+        lastPixelZ = Integer.MIN_VALUE;
+        lastTier = -1;
+        idleTicks = MAX_IDLE_TICKS;
+        lastRefreshWasActive = false;
+        Arrays.fill(CACHED_COLORS, FOG_COLOR);
         BiomeMapExplorationState.clear();
     }
 
@@ -149,7 +168,7 @@ public final class BiomeMapClientData {
         lastTier = BiomeMapItem.getZoomTier();
         lastRefreshWasActive = true;
 
-        BiomeMapExplorationState.updateExploration(level, player.blockPosition(), EXPLORE_RADIUS_CHUNKS);
+        BiomeMapExplorationState.updateExploration(level, player.blockPosition(), explorationRadiusChunks());
 
         if (rebuildColors(level, saved, pixelX * blocksPerPixel, pixelZ * blocksPerPixel, blocksPerPixel)) {
             // Only re-upload when the pixels actually changed.
@@ -157,10 +176,24 @@ public final class BiomeMapClientData {
         }
     }
 
+    /**
+     * 探索半径 / Exploration radius in chunks. Follows the client's effective render distance but is
+     * at least the map's half-width in chunks (64 pixels x chunks-per-pixel, i.e. 128 for the macro
+     * tier and 256 for the wide tier), so a raised view distance genuinely widens the uncovered
+     * ring instead of the map staying a small disc of fog-free terrain. Capped at 256 chunks so a
+     * very high view distance cannot turn each refresh into an absurd quadratic chunk sweep.
+     */
+    private static int explorationRadiusChunks() {
+        int renderDistance = Minecraft.getInstance().options.getEffectiveRenderDistance();
+        int halfMapChunks = HALF * BiomeMapItem.getChunksPerPixel();
+        return Math.max(16, Math.min(256, Math.max(renderDistance + 8, halfMapChunks)));
+    }
+
     /** Repaints the 128x128 colours; returns {@code true} if any byte changed. */
     private static boolean rebuildColors(ClientLevel level, MapItemSavedData saved, int baseX, int baseZ,
                                          int blocksPerPixel) {
         byte[] colors = saved.colors;
+        byte[] cache = CACHED_COLORS;
         boolean changed = false;
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
@@ -172,16 +205,22 @@ public final class BiomeMapClientData {
             for (int px = 0; px < SIZE; px++) {
                 int worldX = baseX + (px - HALF) * blocksPerPixel;
                 int chunkX = worldX >> 4;
+                int index = rowStart + px;
 
                 byte color;
                 if (!BiomeMapExplorationState.isExplored(chunkX, chunkZ)) {
                     color = FOG_COLOR;
+                } else if (!level.getChunkSource().hasChunk(chunkX, chunkZ)) {
+                    // Explored but currently unloaded: keep this pixel's last sampled colour instead
+                    // of querying the empty-chunk biome fallback (which would paint it grey) so
+                    // already-uncovered terrain does not fade out as the player walks away.
+                    color = cache[index];
                 } else {
                     Holder<Biome> biome = level.getBiome(cursor.set(worldX, 64, worldZ));
                     color = colorFor(biome.unwrapKey().map(key -> key.location()).orElse(null));
+                    cache[index] = color;
                 }
 
-                int index = rowStart + px;
                 if (colors[index] != color) {
                     colors[index] = color;
                     changed = true;
