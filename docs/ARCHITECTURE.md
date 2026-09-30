@@ -2,7 +2,7 @@
 
 > **文档定位**：本文是**实现现状（as-built）**文档，回答「代码现在长什么样、谁调用谁」。
 > 玩法意图、路线图与逐项实现状态见 [`docs/DESIGN.md`](DESIGN.md)；版本矩阵、代码规约、热重载边界、质量门禁以根目录 [`AGENTS.md`](../AGENTS.md) 为准。
-> **最后更新**：2026-10-01（对齐 HEAD `3029c56`）。
+> **最后更新**：2026-10-01（对齐 HEAD `833aa31`）。
 > **命名空间**：`weather_realm` · **显示名**：天象之境 / Weather Realm · **modId**：`weather_realm`。
 > **方法**：本文每条结构性断言均按最终代码逐条核对，标注文件路径与行号（行号为该文件总行数标注中的实际位置）。任何与代码不一致处，以代码为准。
 
@@ -44,7 +44,7 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 （可选）weather_altar_core 置于 weather_pedestal 之上
         │  右键打开「天象调控仪」→ SetWeatherPayload → 服务端 setWeatherParameters 改写天气
         ▼
-手持极域天象图（biome_map）查看已探索群系，右键切换 2/4 区块/像素
+手持极域天象图（biome_map）查看全图群系（服务端采样、即时染色），右键切换 2/4 区块/像素
 ```
 
 ---
@@ -76,7 +76,7 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 
 | 文件（行数） | 职责 |
 | :- | :- |
-| `WeatherPortalBlock.java` (163) | 传送门方块，`extends Block implements Portal`；空选框（`:62`）、不可冲毁（`:68`）、`entityInside`→`setAsInsidePortal`（`:79`）、`getPortalDestination`（`:87`）、粒子（`:148`）。 |
+| `WeatherPortalBlock.java` (241) | 传送门方块，`extends Block implements Portal`；空选框（`:65`）、不可冲毁（`:71`）、`entityInside`→`setAsInsidePortal`（`:82`）、`getPortalDestination`（`:90`）、安全落点扫描 `findSafeLandingY`（`:183`）、粒子（`:226`）。 |
 | `WeatherAltarCoreBlock.java` (36) | 祭坛核心 `BaseEntityBlock`（渲染形状 INVISIBLE，视觉由 BER 接管）。 |
 | `WeatherAltarCoreBlockEntity.java` (22) | 核心方块实体（无数据，仅用于挂 BER）。 |
 | `FrostPlantBlock.java` (44) | 冰系植物共享基类：仅可种在 `frost_plantable_on` 或满层雪上（`:28-43`）。 |
@@ -96,7 +96,7 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 
 | 文件（行数） | 职责 |
 | :- | :- |
-| `BiomeMapItem.java` (181) | 极域天象图，`extends MapItem`；固定 `MapId(-1)`（`:50`）；档位 2/4 区块/像素（`:52-61`）；`getCustomMapData` 走客户端注入的 `Function`（`:110`），右键切档（`:123`）。 |
+| `BiomeMapItem.java` (204) | 极域天象图，`extends MapItem`；固定 `MapId(-1)`（`:53`）；档位 1/2（2/4 区块/像素，`:56-58`）；`getCustomMapData` 走客户端注入的 `Function`（`:131`），右键切档并上报 C2S 档位（`:164`）。 |
 | `ClimateShardItem.java` (18) | 气候碎片，**刻意惰性**（点燃逻辑在 `portal/ClimatePortalHandler`）。 |
 | `AncientWeatherTomeItem.java` (87) | 《古代天气研究手记》；反射调 Patchouli，缺失时聊天栏降级（`:48-86`）。 |
 | `FrostMilkBucketItem.java` (16) | 冰牛奶桶（继承原版牛奶行为）。 |
@@ -118,27 +118,36 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 | `FrostSheepRenderer.java` (28) / `FrostSheepFurLayer.java` (41) | 冰原羊本体与羊毛层。 |
 | `FrostCowRenderer.java` (17) / `FrostPigRenderer.java` (17) / `FrostCatRenderer.java` (17) | 薄壳子类，仅换贴图。 |
 | `FrostEntityTextures.java` (27) | 三个冰系生物贴图路径共享。 |
-| `map/BiomeMapClientData.java` (249) | 天象图像素数据源：128×128 `MapItemSavedData`、探索迷雾、落图缓存、调色（`:94-248`）。 |
-| `map/BiomeMapExplorationState.java` (58) | 客户端探索状态（内存 `LongSet`，登录时清空）。 |
+| `map/BiomeMapClientData.java` (141) | 天象图像素消费者：128×128 `MapItemSavedData`；接收 S2C 网格→写入 `colors`→脏检查→`MapRenderer.update(MAP_ID, saved)`；玩家箭头与档位上报（`:100-130`）。 |
 
 ### 2.5 `world/`（世界生成）
 
 | 文件（行数） | 职责 |
 | :- | :- |
-| `ModSurfaceRules.java` (193) | 三群系全柱地表规则；`wrapSurfaceRules` 记忆化（`:95`）、`createModRules`（`:126`）、三群系规则（`:139`/`:159`/`:179`）。 |
+| `ModSurfaceRules.java` (201) | 三群系全柱地表规则；原版 deepslate 式噪声过渡 `DEEP_GRADIENT`（`:77`）、`wrapSurfaceRules` 记忆化（`:103`）、`createModRules`（`:134`）、三群系规则（`:147`/`:167`/`:187`）。 |
 | `FrostVillageStructure.java` (153) | 仿 `JigsawStructure`，把放置元素改写为带 `FrostWoodProcessor`（`:97-147`）。 |
 | `FrostWoodProcessor.java` (79) | 把云杉族换为坚冰木族、把猪/猫实体换为冰原猪/冰原猫（`:31-33`、`:59-78`）。 |
 | `FrostWoodMapping.java` (75) | 云杉 → 坚冰木的方块状态重映射（保留 facing/axis 等属性）。 |
 | `FrostPoolElements.java` (59) | 给池元素烘焙额外处理器，使其在结构序列化后仍存活。 |
 
-### 2.6 其余包
+### 2.6 `map/`（天象图服务端采样，common 侧）
+
+| 文件（行数） | 职责 |
+| :- | :- |
+| `map/BiomeMapPalette.java` (61) | 共享调色板：群系 ID → `MapColor` packed byte（`UNKNOWN`/`CRYSTAL`/`BLAZING`/`ARID`），服务端采样与客户端底色共用；仅引 common 的 `MapColor`/`Biome`（`:17-60`）。 |
+| `map/BiomeMapServerSampler.java` (175) | 服务端噪声采样器：128×128 网格、采样高度 `SAMPLE_BLOCK_Y=64`、每 tick 预算 `BUDGET_PER_TICK=2048`、玩家跨像素时 `arraycopy` 增量平移；采样用 `ServerLevel#getUncachedNoiseBiome(x>>2, 64>>2, z>>2)`（`:144-174`）。 |
+| `map/BiomeMapServerHandler.java` (111) | Game 总线调度：`onServerTick` 逐玩家（位于 `crystal_realm` 且手持地图）推进采样，完成后 `PacketDistributor.sendToPlayer` 下发 `BiomeMapGridPayload`；`setTier` 记录 C2S 档位；登出清理（`:42-110`）。 |
+
+### 2.7 其余包
 
 | 文件（行数） | 职责 |
 | :- | :- |
 | `portal/ClimatePortalHandler.java` (160) | `@EventBusSubscriber`（Game）：`onEntityTick`（`:40`）、`tryActivate`（`:65`）、`isPoolValid`（`:89`）、`isRingValid`（`:102`）、`ignite`（`:117`）。 |
-| `network/ModNetwork.java` (48) | `@EventBusSubscriber`（Mod）：注册载荷与处理（`:30-47`）。 |
+| `network/ModNetwork.java` (63) | `@EventBusSubscriber`（Mod）：注册 3 个载荷（SetWeather C2S / BiomeMapGrid S2C / BiomeMapTier C2S）与处理（`:30-62`）。 |
 | `network/SetWeatherPayload.java` (27) | C2S 天气请求 record + `Type`/`StreamCodec`。 |
 | `network/WeatherMode.java` (46) | 晴/雨/雷枚举 + codec + 消息键。 |
+| `network/BiomeMapGridPayload.java` (74) | S2C 天象图网格 record：`originPixelX/Z`、`blocksPerPixel`、`tier`、`colors`（128×128 行主序，16384 B）；客户端接收桥 `ClientReceiver`（`:31-68`）。 |
+| `network/BiomeMapTierPayload.java` (31) | C2S 缩放档位上报 record + `Type`/`StreamCodec`（`:19-30`）。 |
 | `command/PortalCommands.java` (106) | `/build_portal`（OP 2+）：脚下铺未激活底座（`:34-105`）。 |
 | `entity/FrostSheep.java` (91) / `FrostCow.java` (47) / `FrostPig.java` (38) / `FrostCat.java` (35) | 四种冰原动物（掉落/挤奶/剪毛/繁衍覆写）。 |
 | `config/WeatherRealmConfig.java` (80) | COMMON + CLIENT 两个 `ModConfigSpec`（见 §6）。 |
@@ -199,7 +208,7 @@ modContainer.registerConfig(CLIENT, WeatherRealmConfig.CLIENT_SPEC)
 
 - **Common 侧禁止引用 `net.minecraft.client.*`**（`AGENTS.md` §5.3）。当前 `WeatherRealm.java` 对 `net.minecraft.client` **0 命中**。
 - 客户端初始化入口是 `client/ClientSetup.java`（`@EventBusSubscriber(..., value = Dist.CLIENT)`），原先嵌在主类的 `ClientModEvents` 已迁出。
-- 天象图的 Common→Client 桥接：`BiomeMapItem`（Common）只持有一个 `Function<Level, MapItemSavedData>` 静态字段（`BiomeMapItem.java:69`），由客户端类 `BiomeMapClientData` 的静态初始化器安装（`BiomeMapClientData.java:83-88`）。因此专用服务端加载 `BiomeMapItem` 时不会触碰客户端类。
+- 天象图的 Common→Client 桥接：`BiomeMapItem`（Common）只持有一个 `Function<Level, MapItemSavedData>` 静态字段（`BiomeMapItem.java:72`），由客户端类 `BiomeMapClientData` 的静态初始化器安装（`BiomeMapClientData.java:53-58`）；同一初始化器还把 S2C 网格接收桥 `BiomeMapGridPayload.ClientReceiver` 装上（`BiomeMapGridPayload.java:55-68`）。因此专用服务端加载 `BiomeMapItem` 时不会触碰客户端类。
 - 其余客户端专属逻辑（渲染、粒子、GUI、地图）全部位于 `client/**`，并以 `Dist.CLIENT` 或 `value = Dist.CLIENT` 的 `@EventBusSubscriber` 绑定。
 - 验证手段：`.\gradlew.bat runServer` 必须干净启动（`AGENTS.md` §9.2）。
 
@@ -231,73 +240,86 @@ EntityTickEvent.Post
 入口：`block/WeatherPortalBlock.java`
 
 ```
-entityInside (:79)  canUsePortal(false) → entity.setAsInsidePortal(this, pos) (:80-82)
-  └─ 引擎 Portal 管线调用 getPortalDestination (:87)
-       ├─ 目标维度：当前是 crystal_realm → overworld，否则 → crystal_realm (:89-92)
-       ├─ 目标是 overworld：用 targetLevel.getSharedSpawnPos() 作落点 (:98-100)
-       └─ 目标是 crystal_realm (:101-135)：
-            ├─ findClosestBiome3d 搜索最近 crystal_plains (:110-116)
-            │    半径 / 水平步长 / 垂直步长来自 WeatherRealmConfig (:107-109)
-            ├─ targetLevel.getHeight(MOTION_BLOCKING, x, z) 取地表 (:120-121)
-            └─ 3×3 承台：可替换处铺 PACKED_ICE，上方两格清空 (:123-133)
+entityInside (:82)  canUsePortal(false) → entity.setAsInsidePortal(this, pos) (:84)
+  └─ 引擎 Portal 管线调用 getPortalDestination (:90)
+       ├─ 目标维度：当前是 crystal_realm → overworld，否则 → crystal_realm (:92-94)
+       ├─ 目标是 overworld：用 targetLevel.getSharedSpawnPos() 作落点 (:102-103)
+       └─ 目标是 crystal_realm (:104-158)：
+            ├─ findClosestBiome3d 搜索最近 crystal_plains (:113-119)
+            │    半径 / 水平步长 / 垂直步长来自 WeatherRealmConfig (:110-112)
+            ├─ findSafeLandingY(targetLevel, x, z) 取安全落点 (:127, :183-205)：
+            │    ① level.getChunk(...) 先强制加载/生成目标区块 (:191-193)
+            │    ② LevelChunk#getHeight(MOTION_BLOCKING_NO_LEAVES, x&15, z&15) + 1 (:196)
+            │       —— 高度图对未加载区块会退化到世界底部,故必须先 getChunk 再取高度
+            │    ③ 在 [minBuildHeight+1, maxBuildHeight-2] 向上有界扫描第一个
+            │       脚底+头顶两格可站立且脚下可承托的空位 (:197-204)
+            ├─ 失败兜底：回退维度共享出生点并重扫 (:128-134)；仍失败则夹取到
+            │    [minBuildHeight+1, maxBuildHeight-2] (:135-143)
+            └─ 3×3 承台：可替换处铺 PACKED_ICE(位于 landingY-1)，上方两格清空 (:147-156)
        └─ 返回 DimensionTransition(目标level, 目标Vec3, ZERO, yRot, xRot,
-              PLAY_PORTAL_SOUND.then(PLACE_PORTAL_TICKET)) (:137-144)
+              PLAY_PORTAL_SOUND.then(PLACE_PORTAL_TICKET)) (:160-167)
 ```
 
-> 未找到维度时 `getPortalDestination` 返回 `null`（`:93-95`）——**没有**自定义“门缺失”聊天提示（旧设计稿/旧 lang 键 `message.weather_realm.portal.no_dimension` 已删除）。
+> **根因（曾落到地底）**：原实现直接调用 `Level#getHeight`，而该方法对**未加载区块**会返回 `getMinBuildHeight()`（`Level.java:383-398`），导致落点被夹到 y≈-54 的地底。现改为先 `getChunk` 强制生成、再用 `LevelChunk#getHeight` 取真实地表，并向上扫描安全站立点。
+>
+> 未找到维度时 `getPortalDestination` 返回 `null`（`:96-98`）——**没有**自定义“门缺失”聊天提示（旧设计稿/旧 lang 键 `message.weather_realm.portal.no_dimension` 已删除）。
 
 ### 5.3 天气系统
 
 - **服务端**：`ServerWeatherHandler.syncWeather`（`:38-43`）只对进入 `crystal_realm` 的玩家推送 `START_RAINING` + `RAIN_LEVEL_CHANGE(1.0)` + `THUNDER_LEVEL_CHANGE(1.0)`，保证原版雪渲染立即工作；**不再每 tick 全局锁定维度天气**（避免覆盖燃焰/风沙群系）。
 - **客户端**：`ClientBlizzardEffects.onClientTick`（`client/ClientBlizzardEffects.java:41`）在 `crystal_realm` 内按当前群系（仅 `crystal_plains`）把暴风雪强度平滑逼近目标（`:62-65`），驱动 `level.setRainLevel`（`:68`）并生成 `blizzard_snow` 粒子（`:83-100`）。
-- **手动天气**：`gui/WeatherControlScreen.selectMode`（`:46`）→ `PacketDistributor.sendToServer(new SetWeatherPayload(mode))` → `ModNetwork.handleSetWeather`（`network/ModNetwork.java:35`）→ `ServerLevel.setWeatherParameters`，时长取 `WeatherRealmConfig.WEATHER_CLEAR_TIME` / `WEATHER_RAIN_TIME`（`ModNetwork.java:42-44`）。
+- **手动天气**：`gui/WeatherControlScreen.selectMode`（`:46`）→ `PacketDistributor.sendToServer(new SetWeatherPayload(mode))` → `ModNetwork.handleSetWeather`（`network/ModNetwork.java:38`）→ `ServerLevel.setWeatherParameters`，时长取 `WeatherRealmConfig.WEATHER_CLEAR_TIME` / `WEATHER_RAIN_TIME`（`ModNetwork.java:45-47`）。
 - 配置时长见 §6。
 
-### 5.4 天象图（手持地图）
+### 5.4 天象图（手持地图，服务端噪声采样）
 
-入口：`item/BiomeMapItem.java`（Common）与 `client/map/BiomeMapClientData.java`（Client）
+入口：`item/BiomeMapItem.java`（Common）、`map/BiomeMapServerHandler.java` + `map/BiomeMapServerSampler.java`（Common 服务端）、`client/map/BiomeMapClientData.java`（Client）
+
+**为什么由服务端采样**：客户端**无法**自行计算群系——`ClientLevel#getUncachedNoiseBiome` 对未加载区块恒返回 `Biomes.PLAINS`，`ClientChunkCache` 不持有 generator/randomState，且客户端没有世界种子。服务端 `ServerLevel#getUncachedNoiseBiome(qx, qy, qz)`（quart 坐标，方块 `>>2`）是「群系源 + 世界种子」的纯函数，**对未加载区块同样有效**。本维度 `biome_source` 只按 `temperature` 轴切群系，而 `minecraft:overworld` 的 temperature 是 `shifted_noise(y_scale:0)`，故采样结果**与 Y 无关、与区块是否加载无关**；采样高度固定 `SAMPLE_BLOCK_Y=64`（`BiomeMapServerSampler.java:12-21,34`）。
 
 ```
-BiomeMapItem (extends vanilla MapItem)
-  ├─ defaultProperties(): stacksTo(1)、DataComponents.MAP_ID = MapId(-1) (:76-80)
-  ├─ use() (:123): 仅 crystal_realm 可切换，cycleZoom() 换档并提示 (:143-152)
-  └─ getCustomMapData(stack, level) (:110)
-       Common 侧只读静态 Function provider (:117-118)
+服务端 BiomeMapServerHandler（@EventBusSubscriber GAME）
+  └─ onServerTick (:43)  逐玩家：必须位于 crystal_realm 且手持 biome_map（主手/副手），
+        │                 否则移除该玩家缓存 (:47-51)
+        ├─ State 未初始化 → applyTarget + advance；未完成 → advance；已完成 → 空闲 20 tick 后重估 (:57-70)
+        ├─ BiomeMapServerSampler.advance (:144) 每 tick 最多 BUDGET_PER_TICK=2048 次采样，
+        │    全量 128×128(16384 像素) 约 8 tick 完成 (:23-26,35-36)
+        ├─ setTarget (:78)：首次/换档重置；玩家跨像素时 shift() 用 System.arraycopy 增量平移，
+        │    只重采新暴露的行/列 (:114-136)
+        ├─ sample (:167)：worldX/Z = (originPixel + col/row)*blocksPerPixel + half，
+        │    level.getUncachedNoiseBiome(worldX>>2, 64>>2, worldZ>>2) → BiomeMapPalette.colorFor
+        └─ complete 且 version 未下发过 → PacketDistributor.sendToPlayer(BiomeMapGridPayload(
+             originPixelX, originPixelZ, blocksPerPixel, tier, colors.clone())) (:72-77)
 
-BiomeMapClientData（@EventBusSubscriber Dist.CLIENT）
-  ├─ static {} (:83) 安装 provider = BiomeMapClientData::instance
-  ├─ instance(level) (:94) 创建/复用 128×128 MapItemSavedData（维度变化时重建）
-  ├─ onClientTick (:108) → updatePlayerArrow + refreshIfNeeded
-  │    ├─ updatePlayerArrow: addDecoration(PLAYER, 0,0, yRot) (:140-143)
-  │    └─ refreshIfNeeded (:145): 仅手持时，位移/换档/空闲满 100 tick 才重绘
-  │         ├─ BiomeMapExplorationState.updateExploration(半径) (:172)
-  │         └─ rebuildColors (:194) 逐像素：未探索=fog / 已探索未加载=缓存 / 已加载=按群系调色
-  │              → changed 时 gameRenderer.getMapRenderer().update(MAP_ID, saved) (:176)
-  ├─ explorationRadiusChunks (:187) = clamp(max(renderDistance+8, halfMapChunks),16,256)
-  ├─ colorFor (:234): crystal_plains→ICE / blazing_plains→FIRE / arid_wasteland→SAND / 其它→STONE
-  └─ onLoggingOut (:124) 清空数据、缓存与探索状态
+网络（ModNetwork，PROTOCOL_VERSION = "2"）
+  ├─ S2C BiomeMapGridPayload：全量 128×128 行主序字节(16384 B) + 窗口参数 (:33-44)
+  └─ C2S BiomeMapTierPayload：客户端在初始化/换维/换档时上报；服务端 setTier 夹取后采样 (:56-61)
 
-BiomeMapExplorationState（内存态）
-  ├─ EXPLORED_CHUNKS: LongOpenHashSet (:22)
-  ├─ updateExploration (:31) 标记半径内已加载区块
-  ├─ isExplored (:50)
-  └─ clear (:55) 登出时调用
+客户端 BiomeMapClientData（@EventBusSubscriber GAME, Dist.CLIENT）
+  ├─ static {} (:53) 安装 provider = BiomeMapClientData::instance + 网格接收桥 acceptGrid
+  ├─ instance(level) (:64) 创建/复用 128×128 MapItemSavedData（维度变化时重建；底色 UNKNOWN）
+  ├─ onClientTick (:75) → updatePlayerArrow(addDecoration(PLAYER,0,0,yRot)) + reportTierIfNeeded
+  ├─ reportTierIfNeeded (:121)：tier 或维度变化时 PacketDistributor.sendToServer(BiomeMapTierPayload)
+  ├─ acceptGrid (:100)：仅写 MapItemSavedData.colors + 逐字节脏检查，
+  │    有变化才 gameRenderer.getMapRenderer().update(MAP_ID, saved) (:111-114)
+  └─ onLoggingOut (:90) 清空 data / reportedTier / reportedDimension
 ```
 
-> 关键事实：探索进度**不持久化**，是纯客户端内存态，登出即清空（`BiomeMapClientData.java:124-133`、`BiomeMapExplorationState.java:22`）。
+> **迷雾/探索机制已整体移除**：不再有 `BiomeMapExplorationState`、无「未探索=fog」分档，**范围内全图即时按群系染色**（`colorFor`：crystal_plains→ICE / blazing_plains→FIRE / arid_wasteland→SAND / 其它→STONE，见 `map/BiomeMapPalette.java:38-60`）。客户端仅消费服务端网格，`MapId(-1)` 与 `extends MapItem` 继承保持不变（`BiomeMapItem.java:51-53`）。
 
 ### 5.5 世界生成与地表规则
 
 - Mixin（跳板）：`mixin/SurfaceSystemMixin.java` 在 `SurfaceSystem.buildSurface` 参数 `ordinal=0` 上 `@ModifyVariable`，单行委托 `ModSurfaceRules.wrapSurfaceRules(original)`（`:18-19`）。业务全部在普通类里，可热替换。
 - `ModSurfaceRules`：
-  - `wrapSurfaceRules`（`:95`）用 `WRAPPED_RULES`（`ConcurrentHashMap`，`:81`）按输入规则源身份**记忆化**，避免每列重建规则树；`original==null` 时直接返回 `modRules()`。
-  - 三群系规则组 `createModRules`（`:126`）→ `crystal_plains`/`blazing_plains`/`arid_wasteland`（`:139`/`:159`/`:179`）。
+  - `wrapSurfaceRules`（`:103`）用 `WRAPPED_RULES`（`ConcurrentHashMap`，`:89`）按输入规则源身份**记忆化**，避免每列重建规则树；`original==null` 时直接返回 `modRules()`。
+  - 三群系规则组 `createModRules`（`:134`）→ `crystal_plains`/`blazing_plains`/`arid_wasteland`（`:147`/`:167`/`:187`）。
   - 每群系：`ABOVE_BEDROCK`（`aboveBottom(5)`，保留原版基岩层）→ 群系判定 → 序列：
     1. 顶层草皮（`FROST_MOSS` / `VOLCANIC_ASH` / `DRY_TURF`）**仅包裹在 `abovePreliminarySurface()` + `ON_FLOOR`**，避免把洞口/山体内部地板铺成草皮；
-    2. `ABOVE_ZERO` → 浅层岩（`permafrost` / `fire_stone` / `weathered_sandstone`）；
-    3. `BELOW_ZERO` → 深层岩（`deep_*`）。
+    2. `SHALLOW_GRADIENT` → 浅层岩（`permafrost` / `fire_stone` / `weathered_sandstone`）；
+    3. `DEEP_GRADIENT` → 深层岩（`deep_*`）。
+  - 浅/深层分界**不再是 y=0 硬切**，改为原版 deepslate 式噪声过渡：`SurfaceRules.verticalGradient("deepslate", absolute(0), absolute(8))`（`DEEP_GRADIENT`，`:77-78`），`SHALLOW_GRADIENT = not(DEEP_GRADIENT)`（`:81`）。即 **y ≤ 0 深层、y ≥ 8 浅层，中间为逐块噪声带**；刻意复用原版随机名 `"deepslate"` 以与 vanilla 边界逐块对齐。
   - 浅/深层岩分支**故意不做 `abovePreliminarySurface` 包裹**，实现整柱替换，从而让自定义 `ore_replaceables` 标签下的全套矿石生成。
-  - 群系 `ResourceKey` 常量在 `:47-59`。
+  - 群系 `ResourceKey` 常量在 `:51-63`。
 
 ---
 
@@ -331,14 +353,16 @@ BiomeMapExplorationState（内存态）
 
 ## 7. 网络协议（`network/`）
 
-协议版本 `"1"`（`ModNetwork.java:24`）。
+协议版本 `"2"`（`ModNetwork.java:25`；由 `"1"` 升级，因新增天象图网格/档位载荷）。
 
 | Payload | 方向 | Codec | 处理 | 位置 |
 | :- | :- | :- | :- | :- |
-| `SetWeatherPayload(WeatherMode)` | **Client → Server**（`playToServer`，`:32`） | `StreamCodec.composite(WeatherMode.STREAM_CODEC, SetWeatherPayload::mode, SetWeatherPayload::new)` | `ModNetwork.handleSetWeather`：`enqueueWork` 内校验 `ServerPlayer`，取 config 时长调 `setWeatherParameters`，并向该玩家发聊天反馈 | `SetWeatherPayload.java:16-21`、`ModNetwork.java:35-46` |
+| `SetWeatherPayload(WeatherMode)` | **Client → Server**（`playToServer`，`:33`） | `StreamCodec.composite(WeatherMode.STREAM_CODEC, SetWeatherPayload::mode, SetWeatherPayload::new)` | `ModNetwork.handleSetWeather`：`enqueueWork` 内校验 `ServerPlayer`，取 config 时长调 `setWeatherParameters`，并向该玩家发聊天反馈 | `SetWeatherPayload.java:16-21`、`ModNetwork.java:38-50` |
+| `BiomeMapGridPayload(originPixelX, originPixelZ, blocksPerPixel, tier, colors)` | **Server → Client**（`playToClient`，`:34`） | VarInt×4 + `writeByteArray`（16384 B） | `ModNetwork.handleBiomeMapGrid` → `BiomeMapGridPayload.deliverToClient`（客户端桥把字节写入 `MapItemSavedData.colors`） | `BiomeMapGridPayload.java:26-44`、`ModNetwork.java:52-54` |
+| `BiomeMapTierPayload(tier)` | **Client → Server**（`playToServer`，`:35`） | VarInt | `ModNetwork.handleBiomeMapTier` → `BiomeMapServerHandler.setTier`（夹取到 `[TIER_MACRO, TIER_WIDE]`） | `BiomeMapTierPayload.java:19-30`、`ModNetwork.java:56-61` |
 
 - `WeatherMode` 枚举（`CLEAR`/`RAIN`/`THUNDER`）自带 `StreamCodec`（`WeatherMode.java:20-22`），纯数据、无客户端引用。
-- **没有 S2C 载荷**；服务端→客户端的天气同步复用原版 `ClientboundGameEventPacket`（`ServerWeatherHandler.java:40-42`）。
+- 天气的服务端→客户端同步仍**复用原版** `ClientboundGameEventPacket`（`ServerWeatherHandler.java:40-42`），不走自定义 S2C 载荷；`BiomeMapGridPayload` 才是本模组唯一的自定义 S2C 载荷。
 
 ---
 
@@ -363,6 +387,8 @@ BiomeMapExplorationState（内存态）
 4. 取 `build\libs\` 下最新 `weather_realm-*.jar`（排除 `-sources`/`-javadoc`/`-dev`），清理旧 `weather_realm-*.jar` 与遗留 `examplemod-*.jar`（`:155-196`）。
 5. 覆盖复制到目标 `mods\`（默认 `C:\Users\31087\Desktop\mc\.minecraft\versions\1.21.1-NeoForge_21.1.252\mods\`，`:36`），并提示**必须完全重启客户端**（`:203-211`）。
 
+> **改动收尾标准工作流（由团队负责人指定）**：任何代码改动完成后，标准收尾 = **先 `.\gradlew.bat build` 通过 → 再 `.\deploy.ps1` 部署**到 PCL 客户端 mods 目录；部署前必须**完全退出** Minecraft 客户端。**只 build 不部署视为未完成**。纯 Java 逻辑迭代仍可走 IDE HotSwap，但每次收尾都必须 build + deploy。
+
 ---
 
 ## 9. 热重载边界（摘要，详见 `AGENTS.md` §6）
@@ -386,7 +412,7 @@ BiomeMapExplorationState（内存态）
 1. `data/weather_realm/worldgen/biome/<id>.json`：`has_precipitation`/`temperature`/`downfall`/`effects`/`spawners`/`features`（**必须是 11 个数组，索引 0..10**，空阶段写 `[]`）。
 2. `data/weather_realm/dimension/crystal_realm.json` 的 `multi_noise.biomes` 增加参数区间（temperature 等）。
 3. `world/ModSurfaceRules.java`：加 `ResourceKey<Biome>` 常量 + 一个 `createXxxRules()` 并加入 `createModRules()`。
-4. `client/map/BiomeMapClientData.java`：加 `ResourceLocation` 常量与 `colorFor` 分支。
+4. `map/BiomeMapPalette.java`：加对应 `ResourceLocation` 常量与 `colorFor` 分支（服务端采样与客户端底色共用；纯 common，不含客户端类型）。
 5. `lang/zh_cn.json` / `en_us.json`：加 `biome.weather_realm.<id>`。
 6. 结构 / 地物若要生成，补 `worldgen/configured_feature`、`placed_feature`、`structure`、`structure_set`。
 7. **退出到主界面 → 重进存档**（动态注册表，`/reload` 无效）。

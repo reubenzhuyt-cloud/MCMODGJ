@@ -255,6 +255,7 @@ Windows 一律用 `.\gradlew.bat` 前缀。
 
 ### 8.1 一键构建与客户端注入工作流 (PCL 联调)
 
+- **【收尾标准工作流 · 由团队负责人指定】** 任何代码改动完成后,标准收尾 = **先 `.\gradlew.bat build` 通过 → 再 `.\deploy.ps1` 部署**到 PCL 客户端 mods 目录(部署前必须**完全退出** Minecraft 客户端)。**只 build 不部署视为未完成**;部署完成后需在启动器内重启客户端。
 - 命令:`.\deploy.ps1`(PowerShell)或 `.\deploy.bat`(cmd 用户的薄封装,等价于 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File deploy.ps1`)。
 - 流程:校验/设置 `JAVA_HOME` 为 JDK 21 → 执行 `.\gradlew.bat build`(非零退出码立即中止并透传错误码)→ 取 `build\libs\` 下最新的可部署 jar(`weather_realm-1.21.1-1.0.0.jar`,规则为 `<mod_id>-<minecraft_version>-<mod_version>.jar`;已排除 `-sources`/`-javadoc`/`-dev` jar)→ **覆盖**复制到注入目标目录。
 - 注入目标:`C:\Users\31087\Desktop\mc\.minecraft\versions\1.21.1-NeoForge_21.1.252\mods\`(不存在时脚本自动创建)。

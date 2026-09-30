@@ -109,7 +109,7 @@
 | :- | :- | :- |
 | 中文名 | 水晶平原 | `lang/zh_cn.json` |
 | 气候 | `temperature=-0.5`、`downfall=0.9`、有降水 | `worldgen/biome/crystal_plains.json` |
-| 地表 | 顶层雪 / 浮冰 / 冰 / 细雪 / 砂砾，基底 `permafrost` → `deep_permafrost` | `world/ModSurfaceRules.java` |
+| 地表 | 顶层雪 / 浮冰 / 冰 / 细雪 / 砂砾，基底 y ≥ 8 `permafrost` → y ≤ 0 `deep_permafrost`（中间为原版 deepslate 式逐块噪声过渡） | `world/ModSurfaceRules.java` |
 | 生物 | 冰原羊 / 冰原牛 / 冰原猪 / 冰原猫 | 同上 `spawners` |
 | 专属矿 | 冻土暴风雪结晶矿（浅/深）→ `blizzard_crystal` | `placed_feature/ore_permafrost_blizzard_crystal.json` |
 | 植被 | 坚冰木、冰晶花、冰雪草、冰川兰、霜草幼芽、高霜草/高霜冻花、晶冰斑块 | `placed_feature/{frost_tree,frost_flower,...}.json` |
@@ -122,7 +122,7 @@
 | :- | :- | :- |
 | 中文名 | 烈焰平原 | `lang/zh_cn.json` |
 | 气候 | `temperature=2.0`、`downfall=0`、无降水 | `worldgen/biome/blazing_plains.json` |
-| 地表 | `fire_stone` / `deep_fire_stone` | `world/ModSurfaceRules.java` |
+| 地表 | y ≥ 8 `fire_stone` → y ≤ 0 `deep_fire_stone`（deepslate 式噪声过渡） | `world/ModSurfaceRules.java` |
 | 专属矿 | 火石烈火晶石矿 → `blaze_crystal` | `placed_feature/ore_fire_stone_blaze_crystal.json` |
 | 木族/植被 | 焦木（原木/木/去皮原木/树叶）、灰烬兰、烈焰草幼芽、火晶花 | `placed_feature/{scorched_tree,cinder_bloom,flame_sprout,fire_flower}.json` |
 | 缺失 | **无生物刷新**（`spawners` 为空）、**无热害/灼烧机制**、木族无木板及配方 | 同上 JSON 与 `recipe/` 目录 |
@@ -135,7 +135,7 @@
 | :- | :- | :- |
 | 中文名 | 干旱荒原 | `lang/zh_cn.json` |
 | 气候 | `temperature=1.5`、`downfall=0`、无降水 | `worldgen/biome/arid_wasteland.json` |
-| 地表 | `weathered_sandstone` / `deep_weathered_sandstone` | `world/ModSurfaceRules.java` |
+| 地表 | y ≥ 8 `weathered_sandstone` → y ≤ 0 `deep_weathered_sandstone`（deepslate 式噪声过渡） | `world/ModSurfaceRules.java` |
 | 专属矿 | 风化砂石风沙晶石矿 → `wind_crystal` | `placed_feature/ore_weathered_sandstone_wind_crystal.json` |
 | 木族/植被 | 风化木（原木/木/去皮原木/树叶）、沙丘花、风生草、风沙灌木 | `placed_feature/{arid_tree,dune_flower,wind_sprout,arid_bush}.json` |
 | 缺失 | **无生物刷新**、**无沙暴/风蚀机制**、木族无木板及配方 | 同上 JSON 与 `recipe/` 目录 |
@@ -143,7 +143,8 @@
 ### 3.4 表层过渡方块 🟡
 
 - `frost_moss`（耐寒苔藓）、`dry_turf`（干草坪）、`volcanic_ash`（火山灰）已注册并进创造标签与模型，证据：`lang/zh_cn.json`、`ModBlocks.java`。
-- 世界生成期由 `world/ModSurfaceRules.java` 经 `SurfaceSystemMixin` **直接作为三群系顶层草皮铺设**（`ModSurfaceRules.java:139-191` 的 `abovePreliminarySurface` + `ON_FLOOR` 分支），不依赖 `placed_feature`，已确认生效。
+- 世界生成期由 `world/ModSurfaceRules.java` 经 `SurfaceSystemMixin` **直接作为三群系顶层草皮铺设**（`ModSurfaceRules.java:152-154`/`172-174`/`192-194` 的 `abovePreliminarySurface` + `ON_FLOOR` 分支），不依赖 `placed_feature`，已确认生效。
+- **深浅岩分界**已从 y=0 硬切改为**原版 deepslate 式噪声过渡**：`SurfaceRules.verticalGradient("deepslate", absolute(0), absolute(8))`，即 **y ≤ 0 深层 / y ≥ 8 浅层，中间为逐块噪声带**（`ModSurfaceRules.java:77-81`）。
 
 ---
 
@@ -178,7 +179,8 @@
 | 项 | 内容 | 证据 |
 | :- | :- | :- |
 | 四类可平替框架 | 极寒之石（冰/浮冰/蓝冰/雪块/细雪）、晦暗之石（黑曜石/哭泣黑曜石）、荒漠之石（沙/红沙/砂岩/红砂岩/砂砾）、烈焰之石（岩浆块/下界砖/红下界砖/下界岩） | `data/weather_realm/tags/block/{portal_frames_*,climate_portal_frames}.json` |
-| 双向传送 | 任意非 `crystal_realm` 维度 ↔ `crystal_realm`；目标维度未加载时 `getPortalDestination` 返回 `null`（无自定义聊天提示） | `block/WeatherPortalBlock.java:87-95` |
+| 双向传送 | 任意非 `crystal_realm` 维度 ↔ `crystal_realm`；目标维度未加载时 `getPortalDestination` 返回 `null`（无自定义聊天提示） | `block/WeatherPortalBlock.java:90-98` |
+| 落点安全 | 进入 `crystal_realm` 时：`getChunk` 先**强制加载/生成**目标区块 → `LevelChunk#getHeight(MOTION_BLOCKING_NO_LEAVES)` 取最高方块 → 向上有界扫描两格空位；失败回退维度共享出生点。玩家落在**目标区块最高方块之上**，并铺 3×3 浮冰承台 | `block/WeatherPortalBlock.java:183-218` |
 | 调试指令 | `/build_portal`（OP 2+）在脚下生成未激活底座 | `command/PortalCommands.java` |
 | 视觉设计 | 水平面薄片、无碰撞、不可破坏、免疫流体冲毁 | `WeatherPortalBlock` 方块属性 |
 
@@ -193,11 +195,11 @@
 | 中文名 / ID | 极域天象图 / `weather_realm:biome_map` | `lang/zh_cn.json` |
 | 交互 | 右键切换缩放档位（2 区块/像素 ↔ 4 区块/像素），带动作栏提示与翻页音效 | `item/BiomeMapItem.java` |
 | 维度限制 | 仅在天象之境生效，其他维度提示「仅在天象之境能感应四象微鸣」 | `message.weather_realm.biome_map.wrong_dimension` |
-| 渲染 | 复用原版 `MapItem` 第一人称举图姿势与像素管线；像素数据由客户端生成 | `item/BiomeMapItem.java`、`client/map/BiomeMapClientData.java`、`client/map/BiomeMapExplorationState.java` |
+| 渲染 | 复用原版 `MapItem` 第一人称举图姿势与像素管线；**像素由服务端按噪声群系采样后经 S2C 网格包下发**，客户端仅写入纹理并脏检查后重上传 | `item/BiomeMapItem.java`、`map/BiomeMapServerSampler.java`、`network/BiomeMapGridPayload.java`、`client/map/BiomeMapClientData.java` |
 | 双端隔离 | Common 类不引用 `net.minecraft.client.*`，客户端提供者经 `Function` 注入 | `BiomeMapItem` 类注释与实现 |
 
-- 设计意图：把「读环境即读关卡」具象化为**一张会亮的区域图**，引导玩家找到三片群系与结构。
-- 探索状态是**纯客户端内存态**（`LongOpenHashSet`），登出即清空，**不随存档持久化**。证据：`client/map/BiomeMapExplorationState.java:22,55`、`BiomeMapClientData.java:124-133`。
+- 设计意图：把「读环境即读关卡」具象化为**一张即时成图的区域图**，范围内全图直接按群系染色，引导玩家找到三片群系与结构。
+- **无迷雾 / 无逐步探索**：旧版「未探索=fog、仅已加载区块染色、探索进度存内存」的机制已**整体移除**（`BiomeMapExplorationState` 已删除），地图**不再依赖区块加载**——服务端用 `ServerLevel#getUncachedNoiseBiome` 对未加载区块同样可采样（见 `docs/ARCHITECTURE.md` §5.4）。证据：`map/BiomeMapServerSampler.java`、`client/map/BiomeMapClientData.java:100-115`。
 
 ---
 
@@ -239,6 +241,7 @@
 - **风化砂石系**：`weathered_sandstone` / `deep_weathered_sandstone`。
 - **原版平替矿**：煤/铜/铁/金/红石/绿宝石/青金石/钻石，每群系各含浅层 + 深层双变体（共 3×8×2 = 48 个矿石方块）。
 - **专属矿**：`permafrost_blizzard_crystal_ore` → `blizzard_crystal`；`fire_stone_blaze_crystal_ore` → `blaze_crystal`；`weathered_sandstone_wind_crystal_ore` → `wind_crystal`。
+- **深浅岩分界**：各系浅层（y ≥ 8）与深层（y ≤ 0）之间为**原版 deepslate 式逐块噪声过渡**（复用 vanilla 随机名 `"deepslate"`），非 y=0 硬切；证据 `world/ModSurfaceRules.java:77-81`。
 - 证据：`ModBlocks.java` / `ModItems.java`、`worldgen/placed_feature/ore_*.json`、`recipe/*_from_{smelting,blasting}_*.json`。
 
 ### 7.2 晶体系 ✅
@@ -389,7 +392,7 @@
 **已复核（本轮据代码确认，从原「不确定」移出）：**
 
 3. **`frost_moss` / `dry_turf` / `volcanic_ash` 参与世界生成**：✅ 已确认。由 `world/ModSurfaceRules.java` 经 `SurfaceSystemMixin` 作为三群系顶层草皮铺设（不依赖 `placed_feature`）。
-4. **极域天象图探索进度是否持久化**：✅ 已确认**不持久化**。`BiomeMapExplorationState` 是客户端内存 `LongSet`，登出时 `clear()`。
+4. ~~**极域天象图探索进度是否持久化**~~：**已作废**。探索/迷雾机制整体移除（`BiomeMapExplorationState` 已删除），地图改为**服务端噪声采样、范围内全图即时染色**，不再有「探索进度」概念；证据 `map/BiomeMapServerSampler.java`、`client/map/BiomeMapClientData.java:100-115`。
 5. **`weather_altar_core` 的 BER 双层模型是否启用**：✅ 已确认启用。`client/ClientBlockEntityRenderers.java:22` 注册 BER，`:26-28` 通过 `ModelEvent.RegisterAdditional` 加载 shell/inner 两个独立模型。
 6. **模板残留 `Config.java`**：✅ 已删除，替换为 `config/WeatherRealmConfig.java`；其 COMMON/CLIENT 项分别被 `ModNetwork`、`WeatherPortalBlock`、`ClimatePortalHandler` 与 `ClientBlizzardEffects` 读取。
 
