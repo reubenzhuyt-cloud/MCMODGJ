@@ -38,3 +38,6 @@ run/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+
+# 策划/设计文档(本地保留,不入库)
+*.docx
