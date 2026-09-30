@@ -26,6 +26,10 @@ import net.minecraft.world.level.levelgen.VerticalAnchor;
  * mountain and the bedrock-to-surface underground are converted in one pass. That is what lets the
  * full permafrost / deep-permafrost ore suite generate against our own replaceables tags.</p>
  *
+ * <p><b>Noisy deep/shallow transition</b>: the deep/shallow stone split is not a hard cut at y=0 but
+ * a vanilla-style noisy gradient ({@link SurfaceRules#verticalGradient}) that is deep stone at or
+ * below y=0, shallow stone at or above y=8, and a per-block noise blend in between.</p>
+ *
  * <p><b>Topsoil guard</b>: {@code ON_FLOOR} is true for any solid block that has at most one solid
  * block above it, so on its own it would also skin cave floors and the undersides of overhangs (the
  * surface system evaluates the entire column, top to {@code minBuildHeight}). The topsoil branch is
@@ -65,12 +69,16 @@ public final class ModSurfaceRules {
     private static final SurfaceRules.ConditionSource ABOVE_BEDROCK =
             SurfaceRules.yBlockCheck(VerticalAnchor.aboveBottom(5), 0);
 
-    /** Y >= 0 判定 / True for the shallow half of the column. */
-    private static final SurfaceRules.ConditionSource ABOVE_ZERO =
-            SurfaceRules.yBlockCheck(VerticalAnchor.absolute(0), 0);
+    /**
+     * 原版 deepslate 式噪声过渡 / Vanilla-style noisy deepslate gradient: deep stone at/below y=0,
+     * shallow stone at/above y=8, noisy blend in between. Reuses vanilla's random name "deepslate"
+     * (-> minecraft:deepslate) so the transition is byte-identical to vanilla's deepslate boundary.
+     */
+    private static final SurfaceRules.ConditionSource DEEP_GRADIENT =
+            SurfaceRules.verticalGradient("deepslate", VerticalAnchor.absolute(0), VerticalAnchor.absolute(8));
 
-    /** Y < 0 判定 / True for the deep half of the column. */
-    private static final SurfaceRules.ConditionSource BELOW_ZERO = SurfaceRules.not(ABOVE_ZERO);
+    /** 浅层判定(DEEP_GRADIENT 的补集)/ Shallow stone; complement of {@link #DEEP_GRADIENT}. */
+    private static final SurfaceRules.ConditionSource SHALLOW_GRADIENT = SurfaceRules.not(DEEP_GRADIENT);
 
     /**
      * Memoised {@code original -> prepended} rule trees, keyed by the identity of the incoming rule
@@ -132,9 +140,9 @@ public final class ModSurfaceRules {
 
     /**
      * 极寒群系全柱替换 / Frozen biome, full-column swap: the top floor block becomes
-     * {@code frost_moss}, every stone above y=0 becomes {@code permafrost} and everything below
-     * becomes {@code deep_permafrost}, all the way down to (but not including) the vanilla bedrock
-     * floor.
+     * {@code frost_moss}, stone becomes {@code permafrost} above the deepslate-style noisy
+     * gradient (y >= 8) and {@code deep_permafrost} at or below y=0, all the way down to (but not
+     * including) the vanilla bedrock floor.
      */
     private static SurfaceRules.RuleSource createCrystalPlainsRules() {
         return SurfaceRules.ifTrue(ABOVE_BEDROCK,
@@ -144,17 +152,17 @@ public final class ModSurfaceRules {
                                 SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
                                         SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
                                                 SurfaceRules.state(ModBlocks.FROST_MOSS.get().defaultBlockState()))),
-                                // 浅层岩 / 深层岩:保持整柱替换
-                                SurfaceRules.ifTrue(ABOVE_ZERO,
+                                // 原版 deepslate 式噪声过渡(y ≤ 0 深层 / y ≥ 8 浅层,中间为噪声带)
+                                SurfaceRules.ifTrue(SHALLOW_GRADIENT,
                                         SurfaceRules.state(ModBlocks.PERMAFROST.get().defaultBlockState())),
-                                SurfaceRules.ifTrue(BELOW_ZERO,
+                                SurfaceRules.ifTrue(DEEP_GRADIENT,
                                         SurfaceRules.state(ModBlocks.DEEP_PERMAFROST.get().defaultBlockState())))));
     }
 
     /**
      * 炎热群系全柱替换 / Scorching biome, full-column swap: the top floor block becomes
-     * {@code volcanic_ash}, every stone above y=0 becomes {@code fire_stone} and everything below
-     * becomes {@code deep_fire_stone}.
+     * {@code volcanic_ash}, stone becomes {@code fire_stone} above the deepslate-style noisy
+     * gradient (y >= 8) and {@code deep_fire_stone} at or below y=0.
      */
     private static SurfaceRules.RuleSource createBlazingPlainsRules() {
         return SurfaceRules.ifTrue(ABOVE_BEDROCK,
@@ -164,17 +172,17 @@ public final class ModSurfaceRules {
                                 SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
                                         SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
                                                 SurfaceRules.state(ModBlocks.VOLCANIC_ASH.get().defaultBlockState()))),
-                                // 浅层岩 / 深层岩:保持整柱替换
-                                SurfaceRules.ifTrue(ABOVE_ZERO,
+                                // 原版 deepslate 式噪声过渡(y ≤ 0 深层 / y ≥ 8 浅层,中间为噪声带)
+                                SurfaceRules.ifTrue(SHALLOW_GRADIENT,
                                         SurfaceRules.state(ModBlocks.FIRE_STONE.get().defaultBlockState())),
-                                SurfaceRules.ifTrue(BELOW_ZERO,
+                                SurfaceRules.ifTrue(DEEP_GRADIENT,
                                         SurfaceRules.state(ModBlocks.DEEP_FIRE_STONE.get().defaultBlockState())))));
     }
 
     /**
      * 旱地群系全柱替换 / Arid biome, full-column swap: the top floor block becomes {@code dry_turf},
-     * every stone above y=0 becomes {@code weathered_sandstone} and everything below becomes
-     * {@code deep_weathered_sandstone}.
+     * stone becomes {@code weathered_sandstone} above the deepslate-style noisy gradient (y >= 8)
+     * and {@code deep_weathered_sandstone} at or below y=0.
      */
     private static SurfaceRules.RuleSource createAridWastelandRules() {
         return SurfaceRules.ifTrue(ABOVE_BEDROCK,
@@ -184,10 +192,10 @@ public final class ModSurfaceRules {
                                 SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
                                         SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
                                                 SurfaceRules.state(ModBlocks.DRY_TURF.get().defaultBlockState()))),
-                                // 浅层岩 / 深层岩:保持整柱替换
-                                SurfaceRules.ifTrue(ABOVE_ZERO,
+                                // 原版 deepslate 式噪声过渡(y ≤ 0 深层 / y ≥ 8 浅层,中间为噪声带)
+                                SurfaceRules.ifTrue(SHALLOW_GRADIENT,
                                         SurfaceRules.state(ModBlocks.WEATHERED_SANDSTONE.get().defaultBlockState())),
-                                SurfaceRules.ifTrue(BELOW_ZERO,
+                                SurfaceRules.ifTrue(DEEP_GRADIENT,
                                         SurfaceRules.state(ModBlocks.DEEP_WEATHERED_SANDSTONE.get().defaultBlockState())))));
     }
 }
