@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:campfire_cooking",
+  "category": "food",
+  "cookingtime": 600,
+  "experience": 0.35,
+  "ingredient": {
+    "item": "weather_realm:frost_beef"
+  },
+  "result": {
+    "id": "weather_realm:cooked_frost_beef"
+  }
+}

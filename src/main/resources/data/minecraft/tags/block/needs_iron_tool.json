@@ -1,0 +1,29 @@
+{
+  "replace": false,
+  "values": [
+    "weather_realm:permafrost_gold_ore",
+    "weather_realm:deep_permafrost_gold_ore",
+    "weather_realm:permafrost_redstone_ore",
+    "weather_realm:deep_permafrost_redstone_ore",
+    "weather_realm:permafrost_emerald_ore",
+    "weather_realm:deep_permafrost_emerald_ore",
+    "weather_realm:permafrost_diamond_ore",
+    "weather_realm:deep_permafrost_diamond_ore",
+    "weather_realm:fire_stone_gold_ore",
+    "weather_realm:deep_fire_stone_gold_ore",
+    "weather_realm:fire_stone_redstone_ore",
+    "weather_realm:deep_fire_stone_redstone_ore",
+    "weather_realm:fire_stone_emerald_ore",
+    "weather_realm:deep_fire_stone_emerald_ore",
+    "weather_realm:fire_stone_diamond_ore",
+    "weather_realm:deep_fire_stone_diamond_ore",
+    "weather_realm:weathered_sandstone_gold_ore",
+    "weather_realm:deep_weathered_sandstone_gold_ore",
+    "weather_realm:weathered_sandstone_redstone_ore",
+    "weather_realm:deep_weathered_sandstone_redstone_ore",
+    "weather_realm:weathered_sandstone_emerald_ore",
+    "weather_realm:deep_weathered_sandstone_emerald_ore",
+    "weather_realm:weathered_sandstone_diamond_ore",
+    "weather_realm:deep_weathered_sandstone_diamond_ore"
+  ]
+}

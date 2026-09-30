@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:smelting",
+  "category": "misc",
+  "cookingtime": 400,
+  "experience": 1.0,
+  "group": "blizzard_crystal",
+  "ingredient": {
+    "item": "weather_realm:permafrost_blizzard_crystal_ore"
+  },
+  "result": {
+    "id": "weather_realm:blizzard_crystal"
+  }
+}

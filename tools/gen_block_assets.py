@@ -1,0 +1,433 @@
+#!/usr/bin/env python3
+"""Generate textures + client/datapack resources for the blazing / arid biome blocks.
+
+Usage (from the repo root, after `pip install Pillow`):
+
+    python tools/gen_block_assets.py
+    python tools/gen_block_assets.py --root . --client-jar <path to client jar>
+
+16x16 textures are recoloured from the vanilla 1.21.1 client jar, so the mod
+ships no hand-drawn art. Datapack JSON (loot tables, tags) and the lang files are
+*merged* into the existing resources, never overwritten wholesale.
+"""
+from __future__ import annotations
+
+import argparse
+import colorsys
+import glob
+import io
+import json
+import os
+import sys
+import zipfile
+from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import biome_data as bd  # noqa: E402
+
+try:
+    from PIL import Image
+except ImportError:  # pragma: no cover
+    sys.exit("Pillow is required:  pip install Pillow")
+
+MODID = bd.MODID
+
+
+# --- vanilla jar / texture helpers ------------------------------------------
+def find_client_jar(root: Path) -> Path:
+    override = os.environ.get("MC_CLIENT_JAR")
+    candidates = []
+    if override:
+        candidates.append(Path(override))
+    home = Path.home()
+    candidates += [Path(p) for p in glob.glob(str(home / ".gradle/caches/neoformruntime/artifacts/minecraft_1.21.1_client.jar"))]
+    for base in (root, root.parent, home):
+        candidates += [Path(p) for p in glob.glob(str(base / ".minecraft/libraries/net/minecraft/client/**/*extra.jar"), recursive=True)]
+    for c in candidates:
+        if c.is_file():
+            return c
+    sys.exit("Could not find a vanilla client jar; pass --client-jar or set MC_CLIENT_JAR.")
+
+
+def read_png(zf: zipfile.ZipFile, rel: str) -> Image.Image:
+    path = f"assets/minecraft/textures/{rel}.png"
+    with zf.open(path) as fh:
+        return Image.open(io.BytesIO(fh.read())).convert("RGBA")
+
+
+def recolor(img: Image.Image, profile: dict) -> Image.Image:
+    """Hue/saturation/value recolor. Saturated 'speck' pixels are protected."""
+    out = img.copy().convert("RGBA")
+    px = out.load()
+    target_hue = profile.get("target_hue")
+    sat_floor = profile.get("sat_floor", 0.0)
+    sat_mul = profile.get("sat_mul", 1.0)
+    val_mul = profile.get("val_mul", 1.0)
+    protect_sat = profile.get("protect_sat")
+    speck_shift = profile.get("speck_hue_shift", 0.0)
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            hh, ss, vv = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+            if protect_sat is not None and ss >= protect_sat:
+                hh = (hh + speck_shift) % 1.0
+                vv = min(1.0, vv * val_mul)
+            else:
+                hh = target_hue if target_hue is not None else hh
+                ss = min(1.0, max(ss, sat_floor) * sat_mul)
+                vv = min(1.0, vv * val_mul)
+            nr, ng, nb = colorsys.hsv_to_rgb(hh, ss, vv)
+            px[x, y] = (round(nr * 255), round(ng * 255), round(nb * 255), a)
+    return out
+
+
+def palette(img: Image.Image) -> set:
+    """Every distinct RGBA tuple present in ``img``."""
+    px = img.load()
+    return {px[x, y] for y in range(img.height) for x in range(img.width)}
+
+
+def compose_ore(ore_img: Image.Image, vanilla_base: Image.Image, profile: dict,
+                background: Image.Image) -> Image.Image:
+    """Paste one vanilla ore's mineral pixels onto one of our own rock textures.
+
+    The vanilla ore texture's stone background is *not* pixel-identical to
+    ``stone.png``/``deepslate.png`` -- it reuses the same greys in a different
+    arrangement -- so a per-pixel diff against the vanilla rock would misclassify
+    half the background as mineral. The mineral mask is therefore taken by palette
+    membership: any pixel whose colour does not occur in the vanilla rock palette is
+    a mineral pixel. Those pixels are recoloured with ``profile`` and drawn over
+    ``background`` (the already-generated rock texture), which makes the ore's
+    background byte-for-byte identical to the block it belongs to.
+    """
+    recolored = recolor(ore_img, profile)
+    base_palette = palette(vanilla_base)
+    out = background.copy().convert("RGBA")
+    po = ore_img.load()
+    pr = recolored.load()
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            if po[x, y] not in base_palette:
+                px[x, y] = pr[x, y]
+    return out
+
+
+def write_json(path: Path, obj) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def merge_tag(path: Path, values) -> None:
+    data = {"replace": False, "values": []}
+    if path.exists():
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data.setdefault("replace", False)
+        data.setdefault("values", [])
+    for v in values:
+        if v not in data["values"]:
+            data["values"].append(v)
+    write_json(path, data)
+
+
+# --- block specs -------------------------------------------------------------
+def cover_specs():
+    """The three per-biome topsoil covers."""
+    return [
+        dict(
+            name=c["name"], model="cube_all", en=c["en"], zh=c["zh"], loot=("self",),
+            textures=[(c["name"], c["src"], c["profile"])],
+        )
+        for c in bd.SURFACE_COVERS
+    ]
+
+
+def block_specs(theme):
+    """Return the list of block descriptors generated for one theme."""
+    specs = []
+    base, deep = theme["base"], theme["deep"]
+    # Themes flagged ``composite_ores`` build their ores by pasting the vanilla mineral
+    # pixels onto our own rock texture, so the ore background always matches the rock
+    # block byte-for-byte. Other themes keep the legacy whole-texture recolor.
+    ore_composite = (
+        {"background": base, "vanilla_base": "block/stone"} if theme.get("composite_ores") else None)
+    deep_ore_composite = (
+        {"background": deep, "vanilla_base": "block/deepslate"} if theme.get("composite_ores") else None)
+
+    specs.append(dict(
+        name=base, model="cube_all", en=theme["base_en"], zh=theme["base_zh"], loot=("self",),
+        textures=[(base, theme["base_src"], theme["stone_profile"])],
+    ))
+    specs.append(dict(
+        name=deep, model="cube_all", en=theme["deep_en"], zh=theme["deep_zh"], loot=("self",),
+        textures=[(deep, theme["deep_src"], theme["deep_profile"])],
+    ))
+    specs.append(dict(
+        name=theme["crystal_block"], model="cube_all",
+        en=theme["crystal_block_en"], zh=theme["crystal_block_zh"], loot=("self",),
+        textures=[(theme["crystal_block"], theme["crystal_block_src"], theme["crystal_profile"])],
+    ))
+
+    for ore in bd.ORE_ORDER:
+        shallow = bd.shallow_ore(theme, ore)
+        d = bd.deep_ore(theme, ore)
+        specs.append(dict(
+            name=shallow, model="cube_all",
+            en=f"{theme['base_en']} {bd.ORE_EN[ore]} Ore", zh=f"{theme['base_zh']}{bd.ORE_ZH[ore]}矿",
+            loot=("ore", ore),
+            textures=[(shallow, f"block/{ore}_ore", theme["stone_profile"])],
+            composite=ore_composite,
+        ))
+        specs.append(dict(
+            name=d, model="cube_all",
+            en=f"{theme['deep_en']} {bd.ORE_EN[ore]} Ore", zh=f"{theme['deep_zh']}{bd.ORE_ZH[ore]}矿",
+            loot=("ore", ore),
+            textures=[(d, f"block/deepslate_{ore}_ore", theme["deep_profile"])],
+            composite=deep_ore_composite,
+        ))
+
+    cs = bd.shallow_crystal_ore(theme)
+    cd = bd.deep_crystal_ore(theme)
+    specs.append(dict(
+        name=cs, model="cube_all",
+        en=f"{theme['base_en']} {theme['crystal_en']} Ore", zh=f"{theme['base_zh']}{theme['crystal_zh']}矿",
+        loot=("crystal_ore", theme["crystal"]),
+        textures=[(cs, theme["crystal_ore_src"], theme["crystal_ore_profile"])],
+        composite=ore_composite,
+    ))
+    specs.append(dict(
+        name=cd, model="cube_all",
+        en=f"{theme['deep_en']} {theme['crystal_en']} Ore", zh=f"{theme['deep_zh']}{theme['crystal_zh']}矿",
+        loot=("crystal_ore", theme["crystal"]),
+        textures=[(cd, theme["deep_crystal_ore_src"], theme["deep_crystal_ore_profile"])],
+        composite=deep_ore_composite,
+    ))
+
+    wn = bd.wood_block_names(theme)
+    wsrc = theme["wood_src"]
+    specs.append(dict(
+        name=wn["log"], model="pillar", en=theme["wood_names_en"]["log"], zh=theme["wood_names_zh"]["log"],
+        loot=("self",),
+        textures=[(f"{theme['wood']}_log", f"block/{wsrc}_log", theme["wood_profile"]),
+                  (f"{theme['wood']}_log_top", f"block/{wsrc}_log_top", theme["wood_profile"])],
+        pillar_top=f"{theme['wood']}_log_top", pillar_side=f"{theme['wood']}_log",
+    ))
+    specs.append(dict(
+        name=wn["wood"], model="pillar", en=theme["wood_names_en"]["wood"], zh=theme["wood_names_zh"]["wood"],
+        loot=("self",),
+        textures=[(f"{theme['wood']}_log", f"block/{wsrc}_log", theme["wood_profile"])],
+        pillar_top=f"{theme['wood']}_log", pillar_side=f"{theme['wood']}_log",
+    ))
+    specs.append(dict(
+        name=wn["stripped_log"], model="pillar", en=theme["wood_names_en"]["stripped_log"],
+        zh=theme["wood_names_zh"]["stripped_log"], loot=("self",),
+        textures=[(f"stripped_{theme['wood']}_log", f"block/stripped_{wsrc}_log", theme["wood_profile"]),
+                  (f"stripped_{theme['wood']}_log_top", f"block/stripped_{wsrc}_log_top", theme["wood_profile"])],
+        pillar_top=f"stripped_{theme['wood']}_log_top", pillar_side=f"stripped_{theme['wood']}_log",
+    ))
+    specs.append(dict(
+        name=wn["leaves"], model="leaves", en=theme["wood_names_en"]["leaves"],
+        zh=theme["wood_names_zh"]["leaves"], loot=("leaves",),
+        textures=[(f"{theme['wood']}_leaves", f"block/{wsrc}_leaves", theme["leaves_profile"])],
+    ))
+
+    for plant in theme["plants"]:
+        specs.append(dict(
+            name=plant["name"], model="cross", en=plant["en"], zh=plant["zh"], loot=("self",),
+            textures=[(plant["name"], plant["src"], plant["profile"])],
+        ))
+    return specs
+
+
+# --- resource writers --------------------------------------------------------
+def write_block_client(root: Path, spec) -> None:
+    assets = root / "src/main/resources/assets" / MODID
+    name = spec["name"]
+    (assets / "textures/block").mkdir(parents=True, exist_ok=True)
+    composite = spec.get("composite")
+    for out_tex, src_tex, profile in spec["textures"]:
+        if composite is not None:
+            background = Image.open(
+                assets / "textures/block" / f"{composite['background']}.png").convert("RGBA")
+            img = compose_ore(read_png(ZIP, src_tex), read_png(ZIP, composite["vanilla_base"]),
+                              profile, background)
+        else:
+            img = recolor(read_png(ZIP, src_tex), profile)
+        img.save(assets / "textures/block" / f"{out_tex}.png")
+    if spec["model"] == "pillar":
+        side, top = spec["pillar_side"], spec["pillar_top"]
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/cube_column",
+            "textures": {"end": f"{MODID}:block/{top}", "side": f"{MODID}:block/{side}"},
+        })
+        write_json(assets / "models/block" / f"{name}_horizontal.json", {
+            "parent": "minecraft:block/cube_column_horizontal",
+            "textures": {"end": f"{MODID}:block/{top}", "side": f"{MODID}:block/{side}"},
+        })
+        write_json(assets / "blockstates" / f"{name}.json", {
+            "variants": {
+                "axis=x": {"model": f"{MODID}:block/{name}_horizontal", "x": 90, "y": 90},
+                "axis=y": {"model": f"{MODID}:block/{name}"},
+                "axis=z": {"model": f"{MODID}:block/{name}_horizontal", "x": 90},
+            },
+        })
+    elif spec["model"] == "cross":
+        texture = spec["textures"][0][0]
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/cross", "render_type": "minecraft:cutout",
+            "textures": {"cross": f"{MODID}:block/{texture}"},
+        })
+        write_json(assets / "blockstates" / f"{name}.json", {"variants": {"": {"model": f"{MODID}:block/{name}"}}})
+    elif spec["model"] == "leaves":
+        texture = spec["textures"][0][0]
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/cube_all", "render_type": "minecraft:cutout",
+            "textures": {"all": f"{MODID}:block/{texture}"},
+        })
+        write_json(assets / "blockstates" / f"{name}.json", {"variants": {"": {"model": f"{MODID}:block/{name}"}}})
+    else:  # cube_all
+        texture = spec["textures"][0][0]
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/cube_all",
+            "textures": {"all": f"{MODID}:block/{texture}"},
+        })
+        write_json(assets / "blockstates" / f"{name}.json", {"variants": {"": {"model": f"{MODID}:block/{name}"}}})
+
+    if spec["model"] == "cross":
+        write_json(assets / "models/item" / f"{name}.json", {
+            "parent": "minecraft:item/generated",
+            "textures": {"layer0": f"{MODID}:block/{spec['textures'][0][0]}"},
+        })
+    else:
+        write_json(assets / "models/item" / f"{name}.json", {"parent": f"{MODID}:block/{name}"})
+
+
+def write_block_loot(root: Path, spec) -> None:
+    data = root / "src/main/resources/data" / MODID
+    name = spec["name"]
+    when = spec["loot"]
+    if when[0] == "self":
+        table = bd.self_loot(name)
+    elif when[0] == "ore":
+        table = bd.ore_loot(name, when[1])
+    elif when[0] == "crystal_ore":
+        table = bd.crystal_ore_loot(name, when[1])
+    elif when[0] == "leaves":
+        table = bd.leaves_loot(name)
+    else:  # pragma: no cover
+        raise ValueError(when)
+    write_json(data / "loot_table/blocks" / f"{name}.json", table)
+
+
+def write_crystal_item(root: Path, theme) -> None:
+    assets = root / "src/main/resources/assets" / MODID
+    (assets / "textures/item").mkdir(parents=True, exist_ok=True)
+    img = recolor(read_png(ZIP, theme["crystal_src"]), theme["crystal_profile"])
+    img.save(assets / "textures/item" / f"{theme['crystal']}.png")
+    write_json(assets / "models/item" / f"{theme['crystal']}.json", {
+        "parent": "minecraft:item/generated",
+        "textures": {"layer0": f"{MODID}:item/{theme['crystal']}"},
+    })
+
+
+# --- tags / lang -------------------------------------------------------------
+def write_tags(root: Path, covers, specs, themes) -> None:
+    mc_tags = root / "src/main/resources/data/minecraft/tags"
+
+    pickaxe, axe, shovel, logs, leaves, small_flowers, flowers = [], [], [], [], [], [], []
+    needs_stone, needs_iron, needs_diamond = [], [], []
+    for theme in themes:
+        names = [s["name"] for s in specs[theme["key"]]]
+        pickaxe += [n for n in names if n.endswith("_ore") or n in (theme["base"], theme["deep"], theme["crystal_block"])]
+        wn = bd.wood_block_names(theme)
+        axe += [wn["log"], wn["wood"], wn["stripped_log"]]
+        logs += [wn["log"], wn["wood"], wn["stripped_log"]]
+        leaves.append(wn["leaves"])
+        for plant in theme["plants"]:
+            if plant["flower"]:
+                small_flowers.append(plant["name"])
+                flowers.append(plant["name"])
+        for ore in ("copper", "lapis"):
+            needs_stone += [bd.shallow_ore(theme, ore), bd.deep_ore(theme, ore)]
+        for ore in ("gold", "redstone", "emerald", "diamond"):
+            needs_iron += [bd.shallow_ore(theme, ore), bd.deep_ore(theme, ore)]
+        needs_diamond += [bd.shallow_crystal_ore(theme), bd.deep_crystal_ore(theme)]
+
+    shovel += [c["name"] for c in covers]
+
+    merge_tag(mc_tags / "block/mineable/pickaxe.json", [f"{MODID}:{n}" for n in pickaxe])
+    merge_tag(mc_tags / "block/mineable/axe.json", [f"{MODID}:{n}" for n in axe])
+    merge_tag(mc_tags / "block/mineable/shovel.json", [f"{MODID}:{n}" for n in shovel])
+    merge_tag(mc_tags / "block/logs.json", [f"{MODID}:{n}" for n in logs])
+    merge_tag(mc_tags / "block/leaves.json", [f"{MODID}:{n}" for n in leaves])
+    merge_tag(mc_tags / "block/small_flowers.json", [f"{MODID}:{n}" for n in small_flowers])
+    merge_tag(mc_tags / "block/flowers.json", [f"{MODID}:{n}" for n in flowers])
+    merge_tag(mc_tags / "block/needs_stone_tool.json", [f"{MODID}:{n}" for n in needs_stone])
+    merge_tag(mc_tags / "block/needs_iron_tool.json", [f"{MODID}:{n}" for n in needs_iron])
+    merge_tag(mc_tags / "block/needs_diamond_tool.json", [f"{MODID}:{n}" for n in needs_diamond])
+    merge_tag(mc_tags / "item/logs.json", [f"{MODID}:{n}" for n in logs])
+
+
+def write_lang(root: Path, covers, specs, themes) -> None:
+    lang_dir = root / "src/main/resources/assets" / MODID / "lang"
+    en, zh = {}, {}
+    for spec in covers:
+        en[f"block.{MODID}.{spec['name']}"] = spec["en"]
+        zh[f"block.{MODID}.{spec['name']}"] = spec["zh"]
+    for theme in themes:
+        for spec in specs[theme["key"]]:
+            en[f"block.{MODID}.{spec['name']}"] = spec["en"]
+            zh[f"block.{MODID}.{spec['name']}"] = spec["zh"]
+        en[f"item.{MODID}.{theme['crystal']}"] = theme["crystal_en"]
+        zh[f"item.{MODID}.{theme['crystal']}"] = theme["crystal_zh"]
+
+    for filename, table in (("en_us.json", en), ("zh_cn.json", zh)):
+        path = lang_dir / filename
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        data.update(table)
+        write_json(path, data)
+
+
+# --- entry point -------------------------------------------------------------
+def run(root: Path) -> None:
+    global ZIP
+    jar = find_client_jar(root)
+    print(f"[gen] vanilla client jar: {jar}")
+    ZIP = zipfile.ZipFile(jar)
+
+    covers = cover_specs()
+    for spec in covers:
+        write_block_client(root, spec)
+        write_block_loot(root, spec)
+
+    specs = {theme["key"]: block_specs(theme) for theme in bd.THEMES}
+    total = len(covers)
+    for theme in bd.THEMES:
+        for spec in specs[theme["key"]]:
+            write_block_client(root, spec)
+            write_block_loot(root, spec)
+            total += 1
+        write_crystal_item(root, theme)
+    write_tags(root, covers, specs, bd.THEMES)
+    write_lang(root, covers, specs, bd.THEMES)
+    ZIP.close()
+    print(f"[gen] wrote textures + resources for {total} blocks "
+          f"({2 * total} block textures) under {root}")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--root", default=str(Path(__file__).resolve().parents[1]))
+    ap.add_argument("--client-jar", default=None)
+    args = ap.parse_args()
+    if args.client_jar:
+        os.environ["MC_CLIENT_JAR"] = args.client_jar
+    run(Path(args.root).resolve())
+
+
+ZIP: zipfile.ZipFile | None = None
+
+if __name__ == "__main__":
+    main()

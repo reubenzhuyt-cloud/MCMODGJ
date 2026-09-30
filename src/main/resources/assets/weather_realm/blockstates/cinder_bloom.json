@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "weather_realm:block/cinder_bloom"
+    }
+  }
+}

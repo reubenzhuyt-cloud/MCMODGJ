@@ -1,0 +1,42 @@
+{
+  "has_precipitation": false,
+  "temperature": 1.5,
+  "downfall": 0.0,
+  "effects": {
+    "sky_color": 15784042,
+    "fog_color": 14467710,
+    "water_color": 4418698,
+    "water_fog_color": 3426678
+  },
+  "spawners": {},
+  "spawn_costs": {},
+  "carvers": {},
+  "features": [
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [
+      "weather_realm:ore_weathered_sandstone_iron",
+      "weather_realm:ore_weathered_sandstone_coal",
+      "weather_realm:ore_weathered_sandstone_copper",
+      "weather_realm:ore_weathered_sandstone_gold",
+      "weather_realm:ore_weathered_sandstone_redstone",
+      "weather_realm:ore_weathered_sandstone_emerald",
+      "weather_realm:ore_weathered_sandstone_lapis",
+      "weather_realm:ore_weathered_sandstone_diamond",
+      "weather_realm:ore_weathered_sandstone_wind_crystal"
+    ],
+    [],
+    [],
+    [
+      "weather_realm:arid_tree",
+      "weather_realm:dune_flower",
+      "weather_realm:wind_sprout",
+      "weather_realm:arid_bush"
+    ],
+    []
+  ]
+}

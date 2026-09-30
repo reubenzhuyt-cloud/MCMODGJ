@@ -1,0 +1,15 @@
+{
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 19024503,
+    "separation": 14,
+    "spacing": 28,
+    "spread_type": "linear"
+  },
+  "structures": [
+    {
+      "structure": "weather_realm:shelter",
+      "weight": 1
+    }
+  ]
+}

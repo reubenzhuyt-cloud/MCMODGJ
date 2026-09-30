@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:smelting",
+  "category": "food",
+  "cookingtime": 200,
+  "experience": 0.35,
+  "ingredient": {
+    "item": "weather_realm:frost_mutton"
+  },
+  "result": {
+    "id": "weather_realm:cooked_frost_mutton"
+  }
+}

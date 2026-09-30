@@ -1,0 +1,42 @@
+{
+  "name": "天候纪元 41年 · 裂隙之门（终章）",
+  "category": "weather_realm:lore",
+  "icon": "weather_realm:permafrost",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "又两年，我总算参透了那枚碎片的脾气。$(br2)它认得「天气」本身。若以十二格象征四极的基石将它环抱，再以水为镜——天门便有一线可开。"
+    },
+    {
+      "type": "patchouli:multiblock",
+      "name": "气候传送门 · Climate Portal",
+      "multiblock": {
+        "pattern": [
+          [
+            "oisn",
+            "i0ws",
+            "swwi",
+            "niso"
+          ]
+        ],
+        "mapping": {
+          "i": "#weather_realm:portal_frames_ice",
+          "o": "#weather_realm:portal_frames_abyss",
+          "s": "#weather_realm:portal_frames_sand",
+          "n": "#weather_realm:portal_frames_nether",
+          "w": "minecraft:water",
+          "0": "minecraft:water"
+        },
+        "symmetrical": false
+      },
+      "enable_visualize": true,
+      "text": "凿一方 4×4 的基面：正中 2×2 注满水源，外环十二格只需以四极基石交错砌就。$(br2)极寒之石——普通冰、浮冰、蓝冰、雪块；$(br2)晦暗之石——黑曜石、哭泣的黑曜石；$(br2)荒漠之石——沙子、砂岩、砂砾；$(br2)烈焰之石——岩浆块、下界砖、下界岩。$(br2)凡同类材料皆可任意平替，无需苛求稀有的蓝冰或原版黑曜石。$(br2)（点击「Visualize」，3D 模型会每秒自动轮换展示该类别下所有可替代的材料。）"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "以身涉险",
+      "text": "一切就绪，将 $(item)气候碎片$() 投入池心。$(br2)须臾，雷霆自天而落，轰然击水；水化为门，门后是永不停歇的暴雪与呼啸的风。$(br2)我看了很久。然后，迈了进去。$(br2)——若有人读到这一页，请替我看看，门的那一头，究竟有没有春天。"
+    }
+  ]
+}

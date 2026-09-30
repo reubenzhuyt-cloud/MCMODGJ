@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "wooden_fence",
+  "key": {
+    "X": { "item": "weather_realm:frost_planks" },
+    "S": { "item": "minecraft:stick" }
+  },
+  "pattern": [
+    "XSX",
+    "XSX"
+  ],
+  "result": {
+    "id": "weather_realm:frost_fence",
+    "count": 3
+  }
+}

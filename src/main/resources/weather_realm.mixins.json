@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.example.weather_realm.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "SurfaceSystemMixin"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

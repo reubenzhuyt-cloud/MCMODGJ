@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:blasting",
+  "category": "misc",
+  "cookingtime": 200,
+  "experience": 1.0,
+  "group": "blizzard_crystal",
+  "ingredient": {
+    "item": "weather_realm:deep_permafrost_blizzard_crystal_ore"
+  },
+  "result": {
+    "id": "weather_realm:blizzard_crystal"
+  }
+}

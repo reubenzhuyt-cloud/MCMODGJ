@@ -1,0 +1,84 @@
+{
+  "has_precipitation": true,
+  "temperature": -0.5,
+  "downfall": 0.9,
+  "effects": {
+    "sky_color": 9088760,
+    "fog_color": 12638456,
+    "water_color": 4159204,
+    "water_fog_color": 328755,
+    "grass_color": 8439794,
+    "foliage_color": 8435920,
+    "music": {
+      "sound": "weather_realm:music.biome.crystal_plains",
+      "min_delay": 600,
+      "max_delay": 1200,
+      "replace_current_music": true
+    }
+  },
+  "spawners": {
+    "creature": [
+      {
+        "type": "weather_realm:frost_sheep",
+        "weight": 12,
+        "minCount": 2,
+        "maxCount": 4
+      },
+      {
+        "type": "weather_realm:frost_cow",
+        "weight": 10,
+        "minCount": 2,
+        "maxCount": 4
+      },
+      {
+        "type": "weather_realm:frost_pig",
+        "weight": 10,
+        "minCount": 2,
+        "maxCount": 4
+      },
+      {
+        "type": "weather_realm:frost_cat",
+        "weight": 3,
+        "minCount": 1,
+        "maxCount": 2
+      }
+    ]
+  },
+  "spawn_costs": {},
+  "carvers": {},
+  "features": [
+    [],
+    [],
+    [],
+    [],
+    [
+      "weather_realm:crystal_ice_patch"
+    ],
+    [],
+    [
+      "weather_realm:ore_permafrost_iron",
+      "weather_realm:ore_permafrost_coal",
+      "weather_realm:ore_permafrost_copper",
+      "weather_realm:ore_permafrost_gold",
+      "weather_realm:ore_permafrost_redstone",
+      "weather_realm:ore_permafrost_emerald",
+      "weather_realm:ore_permafrost_lapis",
+      "weather_realm:ore_permafrost_diamond",
+      "weather_realm:ore_permafrost_blizzard_crystal"
+    ],
+    [],
+    [],
+    [
+      "weather_realm:frost_tree",
+      "weather_realm:frost_grass",
+      "weather_realm:frost_flower",
+      "weather_realm:frost_sprout",
+      "weather_realm:glacier_bloom",
+      "weather_realm:tall_frost_grass",
+      "weather_realm:tall_frost_flower"
+    ],
+    [
+      "minecraft:freeze_top_layer"
+    ]
+  ]
+}

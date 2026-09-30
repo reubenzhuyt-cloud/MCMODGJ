@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "weather_realm:frost_flower",
+    "weather_realm:glacier_bloom",
+    "weather_realm:cinder_bloom",
+    "weather_realm:fire_flower",
+    "weather_realm:dune_flower"
+  ]
+}

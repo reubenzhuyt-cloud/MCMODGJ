@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "weather_realm:block/fire_stone_diamond_ore"
+  }
+}

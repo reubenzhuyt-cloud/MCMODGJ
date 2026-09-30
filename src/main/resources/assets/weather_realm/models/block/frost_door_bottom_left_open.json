@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/door_bottom_left_open",
+  "textures": {
+    "bottom": "weather_realm:block/frost_door_bottom",
+    "top": "weather_realm:block/frost_door_top"
+  }
+}

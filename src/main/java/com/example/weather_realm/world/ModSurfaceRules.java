@@ -1,0 +1,146 @@
+package com.example.weather_realm.world;
+
+import com.example.weather_realm.WeatherRealm;
+
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.SurfaceRules;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+
+/**
+ * Additional surface rules injected in front of the vanilla overworld rules so that each of the
+ * Glacial Realm's climate biomes gets its own surface material.
+ *
+ * <p>Business logic lives here (not in the mixin) so it can be hot-swapped; the mixin only
+ * delegates to {@link #wrapOverworld(SurfaceRules.RuleSource)}.</p>
+ *
+ * <p><b>Full-column stone replacement</b>: the old {@code ON_FLOOR}/{@code UNDER_FLOOR} depth limits
+ * have been removed on purpose for the stone layers. For every stone block the surface system visits
+ * (which is the whole column, not just the top few layers) the biome rule now wins, so an entire
+ * mountain and the bedrock-to-surface underground are converted in one pass. That is what lets the
+ * full permafrost / deep-permafrost ore suite generate against our own replaceables tags.</p>
+ *
+ * <p><b>Topsoil guard</b>: {@code ON_FLOOR} is true for any solid block that has at most one solid
+ * block above it, so on its own it would also skin cave floors and the undersides of overhangs (the
+ * surface system evaluates the entire column, top to {@code minBuildHeight}). The topsoil branch is
+ * therefore additionally wrapped in {@link SurfaceRules#abovePreliminarySurface()}, exactly how
+ * vanilla {@code SurfaceRuleData.overworld()} keeps its grass/sand/dirt layers on the true surface.
+ * The full-column stone branches are intentionally <em>not</em> wrapped, so cave walls stay stone
+ * and can still host ore veins.</p>
+ *
+ * <p>The remaining vertical guard is {@link #ABOVE_BEDROCK}: it keeps the vanilla bedrock floor
+ * (which lives in the wrapped {@code original} rules) intact so the bottom of the world does not
+ * turn into permafrost. Vanilla builds its bedrock floor from the bottom five layers, so our rules
+ * simply do not claim anything at or below that band.</p>
+ */
+public final class ModSurfaceRules {
+    private ModSurfaceRules() {
+    }
+
+    /** 极寒群系 / Frozen biome. */
+    public static final ResourceKey<Biome> CRYSTAL_PLAINS = ResourceKey.create(
+            Registries.BIOME,
+            ResourceLocation.fromNamespaceAndPath(WeatherRealm.MODID, "crystal_plains"));
+
+    /** 炎热群系 / Scorching biome. */
+    public static final ResourceKey<Biome> BLAZING_PLAINS = ResourceKey.create(
+            Registries.BIOME,
+            ResourceLocation.fromNamespaceAndPath(WeatherRealm.MODID, "blazing_plains"));
+
+    /** 干旱风沙群系 / Arid wasteland biome. */
+    public static final ResourceKey<Biome> ARID_WASTELAND = ResourceKey.create(
+            Registries.BIOME,
+            ResourceLocation.fromNamespaceAndPath(WeatherRealm.MODID, "arid_wasteland"));
+
+    /**
+     * 基岩层之上判定 / True for every y at or above the vanilla bedrock floor band (bottom five
+     * layers). Keeps {@code minecraft:bedrock_floor} working instead of smearing permafrost to y=min.
+     */
+    private static final SurfaceRules.ConditionSource ABOVE_BEDROCK =
+            SurfaceRules.yBlockCheck(VerticalAnchor.aboveBottom(5), 0);
+
+    /** Y >= 0 判定 / True for the shallow half of the column. */
+    private static final SurfaceRules.ConditionSource ABOVE_ZERO =
+            SurfaceRules.yBlockCheck(VerticalAnchor.absolute(0), 0);
+
+    /** Y < 0 判定 / True for the deep half of the column. */
+    private static final SurfaceRules.ConditionSource BELOW_ZERO = SurfaceRules.not(ABOVE_ZERO);
+
+    /**
+     * Prepends the mod's per-biome surface rules to the original (vanilla overworld) rules, so mod
+     * rules win when their biome condition matches and vanilla rules handle everything else.
+     */
+    public static SurfaceRules.RuleSource wrapOverworld(SurfaceRules.RuleSource original) {
+        return SurfaceRules.sequence(createModRules(), original);
+    }
+
+    private static SurfaceRules.RuleSource createModRules() {
+        return SurfaceRules.sequence(
+                createCrystalPlainsRules(),
+                createBlazingPlainsRules(),
+                createAridWastelandRules());
+    }
+
+    /**
+     * 极寒群系全柱替换 / Frozen biome, full-column swap: the top floor block becomes
+     * {@code frost_moss}, every stone above y=0 becomes {@code permafrost} and everything below
+     * becomes {@code deep_permafrost}, all the way down to (but not including) the vanilla bedrock
+     * floor.
+     */
+    private static SurfaceRules.RuleSource createCrystalPlainsRules() {
+        return SurfaceRules.ifTrue(ABOVE_BEDROCK,
+                SurfaceRules.ifTrue(SurfaceRules.isBiome(CRYSTAL_PLAINS),
+                        SurfaceRules.sequence(
+                                // 表层草皮:仅在初步地表之上,避免洞口/山体内部地板被草皮覆盖
+                                SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
+                                        SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+                                                SurfaceRules.state(WeatherRealm.FROST_MOSS.get().defaultBlockState()))),
+                                // 浅层岩 / 深层岩:保持整柱替换
+                                SurfaceRules.ifTrue(ABOVE_ZERO,
+                                        SurfaceRules.state(WeatherRealm.PERMAFROST.get().defaultBlockState())),
+                                SurfaceRules.ifTrue(BELOW_ZERO,
+                                        SurfaceRules.state(WeatherRealm.DEEP_PERMAFROST.get().defaultBlockState())))));
+    }
+
+    /**
+     * 炎热群系全柱替换 / Scorching biome, full-column swap: the top floor block becomes
+     * {@code volcanic_ash}, every stone above y=0 becomes {@code fire_stone} and everything below
+     * becomes {@code deep_fire_stone}.
+     */
+    private static SurfaceRules.RuleSource createBlazingPlainsRules() {
+        return SurfaceRules.ifTrue(ABOVE_BEDROCK,
+                SurfaceRules.ifTrue(SurfaceRules.isBiome(BLAZING_PLAINS),
+                        SurfaceRules.sequence(
+                                // 表层火山灰:仅在初步地表之上,避免洞口/山体内部地板被覆盖
+                                SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
+                                        SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+                                                SurfaceRules.state(WeatherRealm.VOLCANIC_ASH.get().defaultBlockState()))),
+                                // 浅层岩 / 深层岩:保持整柱替换
+                                SurfaceRules.ifTrue(ABOVE_ZERO,
+                                        SurfaceRules.state(WeatherRealm.FIRE_STONE.get().defaultBlockState())),
+                                SurfaceRules.ifTrue(BELOW_ZERO,
+                                        SurfaceRules.state(WeatherRealm.DEEP_FIRE_STONE.get().defaultBlockState())))));
+    }
+
+    /**
+     * 旱地群系全柱替换 / Arid biome, full-column swap: the top floor block becomes {@code dry_turf},
+     * every stone above y=0 becomes {@code weathered_sandstone} and everything below becomes
+     * {@code deep_weathered_sandstone}.
+     */
+    private static SurfaceRules.RuleSource createAridWastelandRules() {
+        return SurfaceRules.ifTrue(ABOVE_BEDROCK,
+                SurfaceRules.ifTrue(SurfaceRules.isBiome(ARID_WASTELAND),
+                        SurfaceRules.sequence(
+                                // 表层干草坪:仅在初步地表之上,避免洞口/山体内部地板被覆盖
+                                SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
+                                        SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+                                                SurfaceRules.state(WeatherRealm.DRY_TURF.get().defaultBlockState()))),
+                                // 浅层岩 / 深层岩:保持整柱替换
+                                SurfaceRules.ifTrue(ABOVE_ZERO,
+                                        SurfaceRules.state(WeatherRealm.WEATHERED_SANDSTONE.get().defaultBlockState())),
+                                SurfaceRules.ifTrue(BELOW_ZERO,
+                                        SurfaceRules.state(WeatherRealm.DEEP_WEATHERED_SANDSTONE.get().defaultBlockState())))));
+    }
+}

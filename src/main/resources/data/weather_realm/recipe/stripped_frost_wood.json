@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "group": "bark",
+  "key": {
+    "X": { "item": "weather_realm:stripped_frost_log" }
+  },
+  "pattern": [
+    "XX",
+    "XX"
+  ],
+  "result": {
+    "id": "weather_realm:stripped_frost_wood",
+    "count": 3
+  }
+}

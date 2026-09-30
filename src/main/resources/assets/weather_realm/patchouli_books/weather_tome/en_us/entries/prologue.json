@@ -1,0 +1,22 @@
+{
+  "name": "Epoch 34 - Drought and First Contact",
+  "category": "weather_realm:lore",
+  "icon": "weather_realm:blizzard_crystal",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The 34th year of the Weather Epoch. The four hundred and sixth day without rain.$(br2)The wells are dry, the riverbed has cracked into a tortoise shell, and the elders kneel in the barren fields, saying the gods have withdrawn their grace.$(br2)I do not believe in gods - only in balanced equations, and in results that can be reproduced."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Cold Has a Texture",
+      "text": "Whenever the clouds drift down from the north, the air over the village turns cold for a heartbeat.$(br2)I measured it again and again: cold has a texture. If cold can arrive with the clouds, then it can surely be kept.$(br2)And if cold can be kept - why not rain?$(br2)From that day I stopped praying, and began to observe."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "The First Core",
+      "text": "I set what instruments I had left against the wind and stood watch the whole night through.$(br2)At dawn, a crystal I had never seen before had condensed in the tray - colder than snow, yet it set my palm burning.$(br2)I named it the $(item)Blizzard Crystal$() - the memory of a weather, sealed in stone.$(br2)It was the first time in my life I laughed in the face of the drought."
+    }
+  ]
+}

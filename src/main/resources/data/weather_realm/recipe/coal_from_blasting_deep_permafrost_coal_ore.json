@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:blasting",
+  "category": "misc",
+  "cookingtime": 200,
+  "experience": 0.1,
+  "group": "coal",
+  "ingredient": {
+    "item": "weather_realm:deep_permafrost_coal_ore"
+  },
+  "result": {
+    "id": "minecraft:coal"
+  }
+}

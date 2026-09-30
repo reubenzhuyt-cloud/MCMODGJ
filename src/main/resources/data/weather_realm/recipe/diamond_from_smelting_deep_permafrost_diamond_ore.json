@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:smelting",
+  "category": "misc",
+  "cookingtime": 400,
+  "experience": 1.0,
+  "group": "diamond",
+  "ingredient": {
+    "item": "weather_realm:deep_permafrost_diamond_ore"
+  },
+  "result": {
+    "id": "minecraft:diamond"
+  }
+}

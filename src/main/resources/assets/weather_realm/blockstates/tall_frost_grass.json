@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "half=lower": {
+      "model": "weather_realm:block/tall_frost_grass_bottom"
+    },
+    "half=upper": {
+      "model": "weather_realm:block/tall_frost_grass_top"
+    }
+  }
+}

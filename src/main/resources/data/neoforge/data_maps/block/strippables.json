@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": {
+    "weather_realm:frost_log": {
+      "stripped_block": "weather_realm:stripped_frost_log"
+    },
+    "weather_realm:frost_wood": {
+      "stripped_block": "weather_realm:stripped_frost_wood"
+    }
+  }
+}

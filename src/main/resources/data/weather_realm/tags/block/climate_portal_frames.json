@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "#weather_realm:portal_frames_ice",
+    "#weather_realm:portal_frames_abyss",
+    "#weather_realm:portal_frames_sand",
+    "#weather_realm:portal_frames_nether"
+  ]
+}

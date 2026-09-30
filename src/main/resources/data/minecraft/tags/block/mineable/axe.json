@@ -1,0 +1,24 @@
+{
+  "replace": false,
+  "values": [
+    "weather_realm:frost_log",
+    "weather_realm:frost_wood",
+    "weather_realm:stripped_frost_log",
+    "weather_realm:stripped_frost_wood",
+    "weather_realm:frost_planks",
+    "weather_realm:frost_stairs",
+    "weather_realm:frost_slab",
+    "weather_realm:frost_fence",
+    "weather_realm:frost_fence_gate",
+    "weather_realm:frost_door",
+    "weather_realm:frost_trapdoor",
+    "weather_realm:frost_pressure_plate",
+    "weather_realm:frost_button",
+    "weather_realm:scorched_log",
+    "weather_realm:scorched_wood",
+    "weather_realm:stripped_scorched_log",
+    "weather_realm:arid_log",
+    "weather_realm:arid_wood",
+    "weather_realm:stripped_arid_log"
+  ]
+}

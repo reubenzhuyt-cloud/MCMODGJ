@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "rolls": 1.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "weather_realm:frost_slab",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "weather_realm:frost_slab",
+                  "properties": { "type": "double" }
+                }
+              ],
+              "count": 2.0
+            },
+            { "function": "minecraft:explosion_decay" }
+          ]
+        }
+      ]
+    }
+  ],
+  "random_sequence": "weather_realm:blocks/frost_slab"
+}

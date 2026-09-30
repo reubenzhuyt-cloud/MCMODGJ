@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "weather_realm:block/scorched_wood_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y": {
+      "model": "weather_realm:block/scorched_wood"
+    },
+    "axis=z": {
+      "model": "weather_realm:block/scorched_wood_horizontal",
+      "x": 90
+    }
+  }
+}

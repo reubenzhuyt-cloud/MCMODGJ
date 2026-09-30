@@ -1,0 +1,12 @@
+{
+  "music.biome.crystal_plains": {
+    "category": "music",
+    "subtitle": "music.weather_realm.crystal_plains",
+    "sounds": [
+      {
+        "name": "weather_realm:music/unyielding_icy_wind",
+        "stream": true
+      }
+    ]
+  }
+}

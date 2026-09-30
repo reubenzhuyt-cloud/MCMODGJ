@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column_horizontal",
+  "textures": {
+    "end": "weather_realm:block/stripped_arid_log_top",
+    "side": "weather_realm:block/stripped_arid_log"
+  }
+}

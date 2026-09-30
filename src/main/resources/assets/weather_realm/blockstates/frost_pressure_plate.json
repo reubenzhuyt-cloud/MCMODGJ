@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "powered=false": {
+      "model": "weather_realm:block/frost_pressure_plate"
+    },
+    "powered=true": {
+      "model": "weather_realm:block/frost_pressure_plate_down"
+    }
+  }
+}

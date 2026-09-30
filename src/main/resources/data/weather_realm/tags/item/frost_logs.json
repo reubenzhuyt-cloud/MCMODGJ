@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "weather_realm:frost_log",
+    "weather_realm:frost_wood",
+    "weather_realm:stripped_frost_log",
+    "weather_realm:stripped_frost_wood"
+  ]
+}

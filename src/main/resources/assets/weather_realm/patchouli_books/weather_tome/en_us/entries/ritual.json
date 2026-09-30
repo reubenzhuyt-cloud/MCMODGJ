@@ -1,0 +1,22 @@
+{
+  "name": "Epoch 37 - The Miraculous Tuning Altar",
+  "category": "weather_realm:lore",
+  "icon": "weather_realm:weather_altar_core",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Three years on, I raised the altar beside the old tree at the heart of the village square.$(br2)With the $(item)Weather Altar Core$() as its heart, I planted a $(item)Tuning Pedestal$() on each of the four sides and let the veins in the stone join end to end - only then will the breath of the sky consent to follow the runes."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "They Call Me a God",
+      "text": "When the core settled upon the pedestal, the whole sky trembled softly in my palm.$(br2)The villagers fell to their knees and called me the Sky-Tuner.$(br2)I only smiled: I had simply invited the clouds to a place willing to listen to them."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "To Summon Wind and Rain",
+      "text": "Since then, holding the $(item)Tuning Chart$() and striking the core once unfolds a tuning diagram from my palm.$(br2)Draw upon it to call the clear sky, the rain, or the thunder - the weather bows its head and obeys a mortal's will.$(br2)(They insist it is a miracle. I still hold, stubbornly, that it is merely an equation not yet balanced.)"
+    }
+  ]
+}

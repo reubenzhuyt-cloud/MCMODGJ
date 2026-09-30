@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:ore",
+  "config": {
+    "discard_chance_on_air_exposure": 0.0,
+    "size": 3,
+    "targets": [
+      {
+        "state": {
+          "Name": "weather_realm:weathered_sandstone_emerald_ore"
+        },
+        "target": {
+          "predicate_type": "minecraft:tag_match",
+          "tag": "weather_realm:weathered_sandstone_ore_replaceables"
+        }
+      },
+      {
+        "state": {
+          "Name": "weather_realm:deep_weathered_sandstone_emerald_ore"
+        },
+        "target": {
+          "predicate_type": "minecraft:tag_match",
+          "tag": "weather_realm:deep_weathered_sandstone_ore_replaceables"
+        }
+      }
+    ]
+  }
+}

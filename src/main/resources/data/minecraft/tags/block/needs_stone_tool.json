@@ -1,0 +1,19 @@
+{
+  "replace": false,
+  "values": [
+    "weather_realm:permafrost_iron_ore",
+    "weather_realm:deep_permafrost_iron_ore",
+    "weather_realm:permafrost_copper_ore",
+    "weather_realm:deep_permafrost_copper_ore",
+    "weather_realm:permafrost_lapis_ore",
+    "weather_realm:deep_permafrost_lapis_ore",
+    "weather_realm:fire_stone_copper_ore",
+    "weather_realm:deep_fire_stone_copper_ore",
+    "weather_realm:fire_stone_lapis_ore",
+    "weather_realm:deep_fire_stone_lapis_ore",
+    "weather_realm:weathered_sandstone_copper_ore",
+    "weather_realm:deep_weathered_sandstone_copper_ore",
+    "weather_realm:weathered_sandstone_lapis_ore",
+    "weather_realm:deep_weathered_sandstone_lapis_ore"
+  ]
+}

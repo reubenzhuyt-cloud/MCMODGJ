@@ -1,0 +1,42 @@
+{
+  "name": "Epoch 41 - The Rift Gate (Finale)",
+  "category": "weather_realm:lore",
+  "icon": "weather_realm:permafrost",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Two years more, and at last I understood the temper of that shard.$(br2)It recognises weather itself. Ring it with twelve cornerstones that stand for the four extremes of every world, and set water as a mirror - then the sky-gate may open by a hair's breadth."
+    },
+    {
+      "type": "patchouli:multiblock",
+      "name": "Climate Portal",
+      "multiblock": {
+        "pattern": [
+          [
+            "oisn",
+            "i0ws",
+            "swwi",
+            "niso"
+          ]
+        ],
+        "mapping": {
+          "i": "#weather_realm:portal_frames_ice",
+          "o": "#weather_realm:portal_frames_abyss",
+          "s": "#weather_realm:portal_frames_sand",
+          "n": "#weather_realm:portal_frames_nether",
+          "w": "minecraft:water",
+          "0": "minecraft:water"
+        },
+        "symmetrical": false
+      },
+      "enable_visualize": true,
+      "text": "Carve a 4x4 base: fill the central 2x2 with source water, and the outer twelve cells need only be paved with four kinds of cornerstone, interleaved.$(br2)Bitter-cold stone - Ice, Packed Ice, Blue Ice, Snow Block;$(br2)Abyssal stone - Obsidian, Crying Obsidian;$(br2)Barren stone - Sand, Sandstone, Gravel;$(br2)Burning stone - Magma Block, Nether Bricks, Netherrack.$(br2)Any like material may be substituted freely - there is no need to hunt for rare Blue Ice or vanilla Obsidian.$(br2)(Click 'Visualize'; the 3D model cycles through every substitute material of each kind, once a second.)"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "To Walk Into the Unknown",
+      "text": "When all was ready, I cast the $(item)Climate Shard$() into the heart of the pool.$(br2)In a moment, thunder fell from the sky and struck the water; the water became a gate, and beyond it, an endless blizzard and a howling wind.$(br2)I looked for a long while. Then I stepped through.$(br2)- If anyone reads this page, look for me: see whether there is, after all, a spring on the far side."
+    }
+  ]
+}

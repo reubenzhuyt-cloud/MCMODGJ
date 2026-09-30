@@ -1,0 +1,24 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "particle": "weather_realm:block/weather_portal",
+    "portal": "weather_realm:block/weather_portal"
+  },
+  "elements": [
+    {
+      "from": [0, 12, 0],
+      "to": [16, 12, 16],
+      "faces": {
+        "up": {
+          "uv": [0, 0, 16, 16],
+          "texture": "#portal"
+        },
+        "down": {
+          "uv": [0, 16, 16, 0],
+          "texture": "#portal"
+        }
+      }
+    }
+  ]
+}

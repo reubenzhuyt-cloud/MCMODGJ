@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "group": "planks",
+  "ingredients": [
+    { "tag": "weather_realm:frost_logs" }
+  ],
+  "result": {
+    "id": "weather_realm:frost_planks",
+    "count": 4
+  }
+}

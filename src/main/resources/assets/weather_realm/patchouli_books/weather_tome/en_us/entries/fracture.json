@@ -1,0 +1,22 @@
+{
+  "name": "Epoch 39 - Loss of Control and Fracture",
+  "category": "weather_realm:lore",
+  "icon": "weather_realm:climate_shard",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "I was wrong.$(br2)That day I meant to drive the rainfall to its full radius, and cast every crystal I had saved for three years into the furnace's heart. By the ninth cycle the light at the core had become a colour I did not recognise - not blue, not white, but a flowing thing, like an open wound."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "In My Mother's Voice",
+      "text": "The wind came from within the furnace and called my name in my mother's voice.$(br2)I tried to pull the crystals out, but my hands would not obey. The whole altar shook, and the sky, like a cloth wrung dry, was twisted into a hole."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "The Climate Shard",
+      "text": "Lightning fell from the sky and shattered the core with a thunderclap. Out of the breaking came a single cold fragment.$(br2)I pocketed it and named it the $(item)Climate Shard$() - neither cold nor warm, only quietly remembering that disaster.$(br2)I had a suspicion it could tear open something larger than a crack."
+    }
+  ]
+}
