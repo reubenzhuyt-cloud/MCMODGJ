@@ -6,6 +6,7 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 
 import com.example.weather_realm.ModDimensions;
+import com.example.weather_realm.network.BiomeMapTierPayload;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
@@ -26,6 +27,7 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * 极域天象图 / Biome Map.
@@ -38,8 +40,9 @@ import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
  *
  * <p>The item always carries {@link #MAP_ID} (a negative id that never collides with the
  * {@code Level.getFreeMapId()} sequence) so the renderer never receives a {@code null} {@link MapId}.
- * That id is purely cosmetic: it keys the client-side {@code MapRenderer} cache. The map's actual
- * pixel data is produced by the client-only {@code BiomeMapClientData}.</p>
+ * That id is purely cosmetic: it keys the client-side {@code MapRenderer} cache. The map's pixel
+ * data is sampled server-side from the noise biome source and delivered to the client-only
+ * {@code BiomeMapClientData}, which paints the shared texture.</p>
  *
  * <p>This class is common code and must never reference {@code net.minecraft.client.*}. The bridge
  * to the client pixel pipeline is a plain {@link Function} installed at client startup, so a
@@ -88,9 +91,27 @@ public class BiomeMapItem extends MapItem {
         return zoomTier;
     }
 
+    /** 夹取档位 / Clamps an arbitrary tier into {@code [TIER_MACRO, TIER_WIDE]}. */
+    public static int clampTier(int tier) {
+        if (tier < TIER_MACRO) {
+            return TIER_MACRO;
+        }
+        return Math.min(tier, TIER_WIDE);
+    }
+
+    /** 指定档位每像素覆盖区块数 / Chunks per pixel for an arbitrary tier (2 or 4). */
+    public static int chunksPerPixelForTier(int tier) {
+        return clampTier(tier) * CHUNKS_PER_TIER;
+    }
+
+    /** 指定档位每像素覆盖方块数 / Blocks per pixel for an arbitrary tier (32 or 64). */
+    public static int blocksPerPixelForTier(int tier) {
+        return chunksPerPixelForTier(tier) * 16;
+    }
+
     /** 每像素覆盖的区块数 / Chunks covered by one map pixel for the active tier (2 or 4). */
     public static int getChunksPerPixel() {
-        return zoomTier * CHUNKS_PER_TIER;
+        return chunksPerPixelForTier(zoomTier);
     }
 
     /** 128x128 纹理覆盖的总格数 / Total world coverage in blocks (4096 or 8192). */
@@ -142,6 +163,8 @@ public class BiomeMapItem extends MapItem {
     /** Client-only tier swap + actionbar hint + page-turn sound (common APIs only). */
     private static void cycleZoom(Player player) {
         zoomTier = (zoomTier == TIER_MACRO) ? TIER_WIDE : TIER_MACRO;
+        // The server samples the grid, so it must learn the new blocks-per-pixel.
+        PacketDistributor.sendToServer(new BiomeMapTierPayload(zoomTier));
         if (player != null) {
             player.displayClientMessage(
                     Component.translatable("message.weather_realm.biome_map.zoom",
@@ -157,10 +180,10 @@ public class BiomeMapItem extends MapItem {
         return InteractionResult.PASS;
     }
 
-    /** 服务端无 tick 行为（渲染数据完全由客户端生成） / No server-side inventory ticking. */
+    /** 物品无 tick 行为（像素数据由服务端采样后经网格包下发） / No server-side inventory ticking. */
     @Override
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int itemSlot, boolean isSelected) {
-        // Intentionally empty: the pixel data is client-generated via getCustomMapData.
+        // Intentionally empty: pixels are sampled server-side and delivered as a grid payload.
     }
 
     /**
