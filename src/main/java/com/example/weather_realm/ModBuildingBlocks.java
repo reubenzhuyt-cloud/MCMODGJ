@@ -52,7 +52,7 @@ public final class ModBuildingBlocks {
     public static final BlockSetType ARID_BLOCK_SET_TYPE = BlockSetType.register(new BlockSetType("arid"));
     public static final WoodType ARID_WOOD_TYPE = WoodType.register(new WoodType("arid", ARID_BLOCK_SET_TYPE));
 
-    public record StoneLayer(String name, DeferredBlock<Block> base,
+    public record StoneLayer(String name,
                              DeferredBlock<Block> polished, DeferredBlock<StairBlock> polishedStairs,
                              DeferredBlock<SlabBlock> polishedSlab, DeferredBlock<WallBlock> polishedWall,
                              DeferredBlock<Block> bricks, DeferredBlock<StairBlock> brickStairs,
@@ -80,7 +80,7 @@ public final class ModBuildingBlocks {
                                 DeferredBlock<ChainBlock> chain) {
     }
 
-    public record EcoSet(String prefix, DeferredBlock<AmethystClusterBlock> cluster,
+    public record EcoSet(String prefix, String layerWord, DeferredBlock<AmethystClusterBlock> cluster,
                          DeferredBlock<SnowLayerBlock> layer, DeferredBlock<WeatherSpikeBlock> spike) {
     }
 
@@ -90,7 +90,7 @@ public final class ModBuildingBlocks {
     public static final List<DecorationSet> DECORATIONS = new ArrayList<>();
     public static final List<EcoSet> ECO_ITEMS = new ArrayList<>();
 
-    private static StoneLayer layer(String name, DeferredBlock<Block> base, BlockBehaviour.Properties props,
+    private static StoneLayer layer(String name, BlockBehaviour.Properties props,
                                     boolean deep) {
         DeferredBlock<Block> polished = BLOCKS.registerSimpleBlock(name + "_polished", props);
         DeferredBlock<StairBlock> polishedStairs = BLOCKS.register(name + "_polished_stairs",
@@ -110,7 +110,7 @@ public final class ModBuildingBlocks {
         DeferredBlock<Block> chiseled = BLOCKS.registerSimpleBlock(name + "_chiseled", props);
         DeferredBlock<RotatedPillarBlock> pillar = deep ? null : BLOCKS.register(name + "_pillar",
                 () -> new RotatedPillarBlock(BlockBehaviour.Properties.ofFullCopy(bricks.get())));
-        return new StoneLayer(name, base, polished, polishedStairs, polishedSlab, polishedWall,
+        return new StoneLayer(name, polished, polishedStairs, polishedSlab, polishedWall,
                 bricks, brickStairs, brickSlab, brickWall, cracked, chiseled, pillar);
     }
 
@@ -186,13 +186,14 @@ public final class ModBuildingBlocks {
 
     private static EcoSet ecoSet(String prefix, MapColor color, int lightLevel,
                                  SoundType sound, float strength) {
+        String word = layerWord(prefix);
         DeferredBlock<AmethystClusterBlock> cluster = BLOCKS.register(prefix + "_crystal_cluster",
                 () -> new AmethystClusterBlock(7.0F, 3.0F, BlockBehaviour.Properties.of()
                         .mapColor(color).forceSolidOn().noOcclusion()
                         .sound(SoundType.AMETHYST_CLUSTER).strength(strength)
                         .lightLevel(state -> lightLevel)
                         .pushReaction(PushReaction.DESTROY)));
-        DeferredBlock<SnowLayerBlock> layer = BLOCKS.register(prefix + "_" + layerWord(prefix) + "_layer",
+        DeferredBlock<SnowLayerBlock> layer = BLOCKS.register(prefix + "_" + word + "_layer",
                 () -> new SnowLayerBlock(BlockBehaviour.Properties.of()
                         .mapColor(color).strength(0.1F).requiresCorrectToolForDrops()
                         .sound(sound).isViewBlocking((state, level, pos) -> false)
@@ -202,9 +203,10 @@ public final class ModBuildingBlocks {
                         .mapColor(color).forceSolidOn().noOcclusion()
                         .sound(sound).strength(strength)
                         .pushReaction(PushReaction.DESTROY)));
-        return new EcoSet(prefix, cluster, layer, spike);
+        return new EcoSet(prefix, word, cluster, layer, spike);
     }
 
+    /** The per-theme cover-noun used by the layer block id; single Java-side source of truth. */
     private static String layerWord(String prefix) {
         return switch (prefix) {
             case "frost" -> "snow";
@@ -213,24 +215,24 @@ public final class ModBuildingBlocks {
         };
     }
 
-    private static void stoneFamily(String themeKey, String shallowName, DeferredBlock<Block> shallowBase,
-                                    String deepName, DeferredBlock<Block> deepBase,
+    private static void stoneFamily(String themeKey, String shallowName,
+                                    String deepName,
                                     BlockBehaviour.Properties shallowProps, BlockBehaviour.Properties deepProps) {
         STONE_FAMILIES.add(new StoneFamily(themeKey,
-                layer(shallowName, shallowBase, shallowProps, false),
-                layer(deepName, deepBase, deepProps, true)));
+                layer(shallowName, shallowProps, false),
+                layer(deepName, deepProps, true)));
     }
 
     static {
-        stoneFamily("frost", "permafrost", ModBlocks.PERMAFROST,
-                "deep_permafrost", ModBlocks.DEEP_PERMAFROST,
+        stoneFamily("frost", "permafrost",
+                "deep_permafrost",
                 ModBlockProperties.stoneLike(MapColor.STONE, 2.25F, 6.0F, SoundType.DEEPSLATE),
                 ModBlockProperties.stoneLike(MapColor.DEEPSLATE, 4.5F, 6.0F, SoundType.DEEPSLATE));
-        stoneFamily("fire", "fire_stone", ModBlocks.FIRE_STONE,
-                "deep_fire_stone", ModBlocks.DEEP_FIRE_STONE,
+        stoneFamily("fire", "fire_stone",
+                "deep_fire_stone",
                 ModBlockProperties.fireStone(), ModBlockProperties.deepFireStone());
-        stoneFamily("wind", "weathered_sandstone", ModBlocks.WEATHERED_SANDSTONE,
-                "deep_weathered_sandstone", ModBlocks.DEEP_WEATHERED_SANDSTONE,
+        stoneFamily("wind", "weathered_sandstone",
+                "deep_weathered_sandstone",
                 ModBlockProperties.weatheredSandstone(), ModBlockProperties.deepWeatheredSandstone());
 
         WOOD_FAMILIES.add(woodFamily("scorched", "fire", SCORCHED_BLOCK_SET_TYPE, SCORCHED_WOOD_TYPE,

@@ -1,6 +1,5 @@
 package com.example.weather_realm;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -249,19 +248,13 @@ public final class ModItems {
     // ============================================================================================
     // 建筑方块 BlockItem 批量注册 / Building-block items (design §8.2)
     // ============================================================================================
-    public static final List<DeferredItem<BlockItem>> BUILDING_BLOCK_ITEMS = new ArrayList<>();
-
     private static DeferredItem<BlockItem> buildingItem(String name, DeferredBlock<? extends Block> block) {
-        DeferredItem<BlockItem> item = ITEMS.registerSimpleBlockItem(name, block);
-        BUILDING_BLOCK_ITEMS.add(item);
-        return item;
+        return ITEMS.registerSimpleBlockItem(name, block);
     }
 
     private static DeferredItem<BlockItem> buildingDoorItem(String name, DeferredBlock<? extends Block> block) {
-        DeferredItem<BlockItem> item = ITEMS.register(name,
+        return ITEMS.register(name,
                 () -> new DoubleHighBlockItem(block.get(), new Item.Properties()));
-        BUILDING_BLOCK_ITEMS.add(item);
-        return item;
     }
 
     static {
@@ -308,11 +301,7 @@ public final class ModItems {
         }
         for (ModBuildingBlocks.EcoSet set : ModBuildingBlocks.ECO_ITEMS) {
             buildingItem(set.prefix() + "_crystal_cluster", set.cluster());
-            buildingItem(set.prefix() + "_" + switch (set.prefix()) {
-                case "frost" -> "snow";
-                case "blaze" -> "ash";
-                default -> "sand";
-            } + "_layer", set.layer());
+            buildingItem(set.prefix() + "_" + set.layerWord() + "_layer", set.layer());
             buildingItem(set.prefix() + "_spike", set.spike());
         }
     }

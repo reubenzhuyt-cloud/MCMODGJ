@@ -642,11 +642,13 @@ def decoration_specs():
 
 
 # --- eco decor specs (sub-project D) ----------------------------------------
-# ``model`` is deliberately a shape the resource verifier already knows (the verifier's
-# ``_BLOCK_MODEL_SUFFIXES`` table is frozen): a cluster renders on ``minecraft:block/cross``
-# and a full layer is a ``cube_all``. ``shape`` drives the generator's dedicated
-# ``cluster`` / ``layer`` / ``spike`` branches, which differ from those base shapes only in
-# the blockstate variant set and the extra segment models.
+# ``model`` is the base parent a cluster/layer reuses (``minecraft:block/cross`` /
+# ``cube_all``); ``shape`` drives the generator's dedicated ``cluster`` / ``layer`` /
+# ``spike`` branches, which differ from those base shapes in the blockstate variant set
+# and in the **extra segment models** (a layer's ``_height2..14``, a spike's ``_tip`` /
+# ``_frustum`` / ``_middle`` / ``_base``). The resource verifier now dispatches on
+# ``shape`` (``verify_building_assets.real_shape``) so those derived models are validated
+# too; the base ``model`` alone would leave them unchecked.
 def cluster_specs():
     """The 3 attachable crystal clusters (vanilla ``AmethystClusterBlock`` reuse).
 
@@ -676,7 +678,7 @@ def layer_specs():
         specs.append(dict(name=name, model="cube_all", shape="layer",
                           en={"snow": "Frost Snow Layer", "ash": "Volcanic Ash Layer",
                               "sand": "Wind Sand Layer"}[word],
-                          zh={"snow": f"{zh}雪层", "ash": f"{zh}灰烬层",
+                          zh={"snow": f"{zh}雪层", "ash": "火山灰层",
                               "sand": f"{zh}沙层"}[word],
                           loot=("self",), tool="shovel", needs=None, tags=[],
                           textures=[(name, "block/snow", profile)], tex={"all": name},
