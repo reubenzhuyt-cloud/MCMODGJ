@@ -390,7 +390,13 @@ def write_block_client(root: Path, spec) -> None:
     elif model == "door":
         bottom = _tx(spec, "parent")
         top_ref = spec.get("tex", {}).get("top")
-        top = f"{MODID}:block/{top_ref}" if top_ref else bottom
+        if not top_ref:
+            raise ValueError(
+                f"door '{name}' is missing tex['top']: doors need distinct upper/lower sprites")
+        top = f"{MODID}:block/{top_ref}"
+        if top == bottom:
+            raise ValueError(
+                f"door '{name}' top and bottom both resolve to {top}: sprites must differ")
         tex = {"bottom": bottom, "top": top}
         for suffix, parent in (("_bottom_left", "door_bottom_left"),
                                ("_bottom_left_open", "door_bottom_left_open"),

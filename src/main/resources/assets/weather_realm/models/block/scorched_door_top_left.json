@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:block/door_top_left",
   "textures": {
-    "bottom": "weather_realm:block/scorched_planks",
-    "top": "weather_realm:block/scorched_planks"
+    "bottom": "weather_realm:block/scorched_door_bottom",
+    "top": "weather_realm:block/scorched_door_top"
   }
 }

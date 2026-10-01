@@ -561,7 +561,17 @@ def wood_specs(family):
         elif suffix == "fence_gate":
             spec["tags"] = ["fence_gates"]
         elif suffix == "door":
+            # A door uses two distinct sprites: a hatched upper panel and a plank
+            # lower panel. Mirror the vanilla oak_door_top / oak_door_bottom pair
+            # (and the hand-authored frost_door_top / frost_door_bottom) instead of
+            # collapsing both halves onto the planks texture.
             spec["tags"] = ["wooden_doors"]
+            spec["tex"] = {"parent": f"{family['prefix']}_door_bottom",
+                           "top": f"{family['prefix']}_door_top"}
+            spec["textures"] = [
+                (f"{family['prefix']}_door_bottom", "block/oak_door_bottom", family["profile"]),
+                (f"{family['prefix']}_door_top", "block/oak_door_top", family["profile"]),
+            ]
             spec["item"] = ("generated", "weather_realm:item/" + name)
             spec["item_textures"] = [(name, "item/oak_door", family["profile"])]
         elif suffix == "trapdoor":
