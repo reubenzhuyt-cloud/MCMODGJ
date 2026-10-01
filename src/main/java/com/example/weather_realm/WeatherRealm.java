@@ -32,9 +32,6 @@ public class WeatherRealm {
         ModStructureTypes.register(modEventBus);  // STRUCTURE_TYPES + STRUCTURE_PROCESSORS
         ModBlockEntities.register(modEventBus);   // BLOCK_ENTITY_TYPE
 
-        // Register the item to a creative tab
-        modEventBus.addListener(ModCreativeTabs::addCreative);
-
         // Register our mod's ModConfigSpec so that FML can create and load the config files for us
         modContainer.registerConfig(ModConfig.Type.COMMON, WeatherRealmConfig.COMMON_SPEC);
         modContainer.registerConfig(ModConfig.Type.CLIENT, WeatherRealmConfig.CLIENT_SPEC);
