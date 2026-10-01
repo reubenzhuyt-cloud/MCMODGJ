@@ -6,7 +6,13 @@
     "sky_color": 15784042,
     "fog_color": 14467710,
     "water_color": 4418698,
-    "water_fog_color": 3426678
+    "water_fog_color": 3426678,
+    "music": {
+      "sound": "weather_realm:music.biome.crystal_plains",
+      "min_delay": 600,
+      "max_delay": 1200,
+      "replace_current_music": true
+    }
   },
   "spawners": {},
   "spawn_costs": {},
