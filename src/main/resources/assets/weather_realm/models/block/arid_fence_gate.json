@@ -1,6 +1,5 @@
 {
   "parent": "minecraft:block/template_fence_gate",
-  "render_type": "minecraft:cutout",
   "textures": {
     "texture": "weather_realm:block/arid_planks"
   }

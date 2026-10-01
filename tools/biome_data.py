@@ -158,14 +158,14 @@ THEMES = [
                                          protect_sat=0.50, speck_hue_shift=-0.38),
         "wood": "arid",
         "wood_src": "birch",
-        # 风化木:强去饱和、偏灰褐,叠加程序化风化颗粒/朽斑/风蚀孔洞(见
-        # gen_block_assets._weather;纯坐标哈希,确定性、无随机)。含 alpha=0 孔洞,
-        # 因此引用这些贴图的方块模型必须带 render_type:cutout(gen 里按 wood_profile
-        # 是否含 weather 自动加)。
+        # 风化木:强去饱和、偏灰褐,叠加程序化风化颗粒/朽斑(见 gen_block_assets._weather;
+        # 纯坐标哈希,确定性、无随机)。实心方块(原木/木/去皮/木板等)是**遮挡邻面**的
+        # 不透明立方体,贴图一旦含 alpha=0,邻面被剔除就会透视,故 holes 必须为 0;
+        # 只有树叶这类天然透明、不遮挡邻面的方块才继续挖洞。
         "wood_profile": dict(target_hue=0.082, sat_floor=0.08, sat_mul=0.45, val_mul=0.80,
                              protect_sat=None, speck_hue_shift=0.0,
                              weather=dict(seed=20261001, grain=0.20, mottle=0.13,
-                                          spot=0.10, holes=0.028)),
+                                          spot=0.10, holes=0.0)),
         "leaves_profile": dict(target_hue=0.100, sat_floor=0.12, sat_mul=0.55, val_mul=0.72,
                                protect_sat=None, speck_hue_shift=0.0,
                                weather=dict(seed=20261002, grain=0.0, mottle=0.16,
@@ -599,11 +599,15 @@ _WOOD_DERIVED = [
 
 
 def wood_specs(family):
-    # Weathered wood generates alpha=0 holes -> every model that shows it must be cutout.
-    wood_cutout = bool(family["profile"].get("weather"))
+    # Solid wood (pillar / planks / stairs / slab / fence / gate / trapdoor / plate / button)
+    # is an opaque, occlusion-culling family whose textures carry no alpha=0, so those models
+    # must NOT declare cutout. Only the door keeps it: its upper half has a vanilla glass
+    # window (alpha=0). ``weathered`` marks the family whose textures we regenerate this round
+    # (arid); scorched keeps its hand-authored pre-existing model style untouched.
+    weathered = bool(family["profile"].get("weather"))
     specs = [dict(name=f"stripped_{family['prefix']}_wood", model="pillar",
                   en=f"Stripped {family['en']} Wood", zh=f"去皮{family['zh']}",
-                  loot=("self",), tool="axe", needs=None, tags=["logs"], cutout=wood_cutout,
+                  loot=("self",), tool="axe", needs=None, tags=["logs"], cutout=False,
                   textures=[], tex={"parent": family["stripped_log"]},
                   pillar_side=family["stripped_log"], pillar_top=family["stripped_log"])]
     for suffix, sen, szh, model in _WOOD_DERIVED:
@@ -611,7 +615,8 @@ def wood_specs(family):
         spec = dict(name=name, model=model, en=f"{family['en']} {sen}", zh=f"{family['zh']}{szh}",
                     loot=("self",), tool="axe", needs=None, tags=[],
                     tex={"parent": f"{family['prefix']}_planks"},
-                    textures=[], item=("parent", name), cutout=wood_cutout)
+                    textures=[], item=("parent", name),
+                    cutout=(suffix == "door" and weathered))
         if suffix == "planks":
             spec["textures"] = [(name, family["planks_src"], family["profile"])]
             spec["tex"] = {"parent": name}
