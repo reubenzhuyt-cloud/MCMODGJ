@@ -138,14 +138,26 @@ def write_json(path: Path, obj) -> None:
 
 def merge_tag(path: Path, values) -> None:
     data = {"replace": False, "values": []}
+    raw = None
+    newline = "\n"
     if path.exists():
-        data = json.loads(path.read_text(encoding="utf-8"))
+        raw = path.read_bytes()
+        if b"\r\n" in raw:
+            newline = "\r\n"
+        data = json.loads(raw.decode("utf-8"))
         data.setdefault("replace", False)
         data.setdefault("values", [])
     for v in values:
         if v not in data["values"]:
             data["values"].append(v)
-    write_json(path, data)
+    text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+    if newline != "\n":
+        text = text.replace("\n", newline)
+    encoded = text.encode("utf-8")
+    if raw == encoded:  # no-op: leave hand-authored file (and its line endings) untouched
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(encoded)
 
 
 # --- block specs -------------------------------------------------------------
@@ -485,14 +497,19 @@ def write_crystal_item(root: Path, theme) -> None:
 
 
 # --- tags / lang -------------------------------------------------------------
-def write_tags(root: Path, covers, specs, themes) -> None:
+def write_tags(root: Path, covers, specs, themes, building_specs) -> None:
     mc_tags = root / "src/main/resources/data/minecraft/tags"
 
     pickaxe, axe, shovel, logs, leaves, small_flowers, flowers = [], [], [], [], [], [], []
     needs_stone, needs_iron, needs_diamond = [], [], []
+    planks, wooden_stairs, wooden_slabs, wooden_fences, wooden_fence_gates = [], [], [], [], []
+    wooden_doors, wooden_trapdoors, wooden_pressure_plates, wooden_buttons = [], [], [], []
+    walls = []
+
     for theme in themes:
         names = [s["name"] for s in specs[theme["key"]]]
-        pickaxe += [n for n in names if n.endswith("_ore") or n in (theme["base"], theme["deep"], theme["crystal_block"])]
+        pickaxe += [n for n in names
+                    if n.endswith("_ore") or n in (theme["base"], theme["deep"], theme["crystal_block"])]
         wn = bd.wood_block_names(theme)
         axe += [wn["log"], wn["wood"], wn["stripped_log"]]
         logs += [wn["log"], wn["wood"], wn["stripped_log"]]
@@ -506,20 +523,53 @@ def write_tags(root: Path, covers, specs, themes) -> None:
         for ore in ("gold", "redstone", "emerald", "diamond"):
             needs_iron += [bd.shallow_ore(theme, ore), bd.deep_ore(theme, ore)]
         needs_diamond += [bd.shallow_crystal_ore(theme), bd.deep_crystal_ore(theme)]
-
     shovel += [c["name"] for c in covers]
 
-    merge_tag(mc_tags / "block/mineable/pickaxe.json", [f"{MODID}:{n}" for n in pickaxe])
-    merge_tag(mc_tags / "block/mineable/axe.json", [f"{MODID}:{n}" for n in axe])
-    merge_tag(mc_tags / "block/mineable/shovel.json", [f"{MODID}:{n}" for n in shovel])
-    merge_tag(mc_tags / "block/logs.json", [f"{MODID}:{n}" for n in logs])
-    merge_tag(mc_tags / "block/leaves.json", [f"{MODID}:{n}" for n in leaves])
-    merge_tag(mc_tags / "block/small_flowers.json", [f"{MODID}:{n}" for n in small_flowers])
-    merge_tag(mc_tags / "block/flowers.json", [f"{MODID}:{n}" for n in flowers])
-    merge_tag(mc_tags / "block/needs_stone_tool.json", [f"{MODID}:{n}" for n in needs_stone])
-    merge_tag(mc_tags / "block/needs_iron_tool.json", [f"{MODID}:{n}" for n in needs_iron])
-    merge_tag(mc_tags / "block/needs_diamond_tool.json", [f"{MODID}:{n}" for n in needs_diamond])
-    merge_tag(mc_tags / "item/logs.json", [f"{MODID}:{n}" for n in logs])
+    tag_targets = {"planks": planks, "logs": logs, "wooden_stairs": wooden_stairs,
+                   "wooden_slabs": wooden_slabs, "wooden_fences": wooden_fences,
+                   "fence_gates": wooden_fence_gates, "wooden_doors": wooden_doors,
+                   "wooden_trapdoors": wooden_trapdoors,
+                   "wooden_pressure_plates": wooden_pressure_plates,
+                   "wooden_buttons": wooden_buttons, "walls": walls}
+    for spec in building_specs:
+        name = spec["name"]
+        tool = spec.get("tool")
+        if tool == "pickaxe":
+            pickaxe.append(name)
+        elif tool == "axe":
+            axe.append(name)
+        elif tool == "shovel":
+            shovel.append(name)
+        needs = spec.get("needs")
+        if needs == "stone":
+            needs_stone.append(name)
+        elif needs == "iron":
+            needs_iron.append(name)
+        elif needs == "diamond":
+            needs_diamond.append(name)
+        for tag in spec.get("tags", []):
+            tag_targets[tag].append(name)
+
+    def mod(items):
+        return [f"{MODID}:{n}" for n in items]
+
+    merge_tag(mc_tags / "block/mineable/pickaxe.json", mod(pickaxe))
+    merge_tag(mc_tags / "block/mineable/axe.json", mod(axe))
+    merge_tag(mc_tags / "block/mineable/shovel.json", mod(shovel))
+    merge_tag(mc_tags / "block/logs.json", mod(logs))
+    merge_tag(mc_tags / "block/leaves.json", mod(leaves))
+    merge_tag(mc_tags / "block/small_flowers.json", mod(small_flowers))
+    merge_tag(mc_tags / "block/flowers.json", mod(flowers))
+    merge_tag(mc_tags / "block/needs_stone_tool.json", mod(needs_stone))
+    merge_tag(mc_tags / "block/needs_iron_tool.json", mod(needs_iron))
+    merge_tag(mc_tags / "block/needs_diamond_tool.json", mod(needs_diamond))
+    merge_tag(mc_tags / "block/walls.json", mod(walls))
+    for fname in ("planks", "wooden_stairs", "wooden_slabs", "wooden_fences",
+                  "fence_gates", "wooden_doors", "wooden_trapdoors",
+                  "wooden_pressure_plates", "wooden_buttons"):
+        merge_tag(mc_tags / "block" / f"{fname}.json", mod(tag_targets[fname]))
+        merge_tag(mc_tags / "item" / f"{fname}.json", mod(tag_targets[fname]))
+    merge_tag(mc_tags / "item/logs.json", mod(logs))
 
 
 def write_lang(root: Path, covers, specs, themes) -> None:
@@ -562,7 +612,17 @@ def run(root: Path) -> None:
             write_block_loot(root, spec)
             total += 1
         write_crystal_item(root, theme)
-    write_tags(root, covers, specs, bd.THEMES)
+    building_specs = []
+    for fam in bd.BUILDING_FAMILIES:
+        if fam["kind"] == "stone":
+            building_specs += bd.stone_specs(fam)
+        elif fam["kind"] == "wood":
+            building_specs += bd.wood_specs(fam)
+    for spec in building_specs:
+        write_block_client(root, spec)
+        write_block_loot(root, spec)
+        total += 1
+    write_tags(root, covers, specs, bd.THEMES, building_specs)
     write_lang(root, covers, specs, bd.THEMES)
     ZIP.close()
     print(f"[gen] wrote textures + resources for {total} blocks "
