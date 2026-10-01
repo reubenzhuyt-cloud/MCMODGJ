@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "#": { "item": "weather_realm:deep_permafrost_bricks" }
+  },
+  "pattern": [
+    "#  ",
+    "## ",
+    "###"
+  ],
+  "result": {
+    "id": "weather_realm:deep_permafrost_brick_stairs",
+    "count": 4
+  }
+}

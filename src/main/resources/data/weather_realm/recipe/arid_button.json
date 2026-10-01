@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "group": "wooden_button",
+  "ingredients": [
+    { "item": "weather_realm:arid_planks" }
+  ],
+  "result": {
+    "id": "weather_realm:arid_button",
+    "count": 1
+  }
+}

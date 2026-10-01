@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "group": "planks",
+  "ingredients": [
+    { "item": "weather_realm:scorched_log" }
+  ],
+  "result": {
+    "id": "weather_realm:scorched_planks",
+    "count": 4
+  }
+}

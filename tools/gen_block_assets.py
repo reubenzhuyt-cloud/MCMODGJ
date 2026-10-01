@@ -608,6 +608,74 @@ def write_lang(root: Path, covers, specs, themes, building_specs) -> None:
         write_json(path, data)
 
 
+def _dump_crafting_recipe(recipe) -> str:
+    """Serialize a crafted recipe in the hand-authored wood-family style.
+
+    Mirrors ``data/weather_realm/recipe/frost_*.json``: 2-space indent, LF,
+    compact ``key``/``ingredients`` entries and no trailing newline.
+    """
+    lines = ["{"]
+    items = list(recipe.items())
+    for idx, (key, value) in enumerate(items):
+        tail = "," if idx < len(items) - 1 else ""
+        if key == "key":
+            pairs = list(value.items())
+            lines.append('  "key": {')
+            for j, (k, v) in enumerate(pairs):
+                comma = "," if j < len(pairs) - 1 else ""
+                lines.append(f'    "{k}": {{ "item": "{v["item"]}" }}{comma}')
+            lines.append("  }" + tail)
+        elif key == "ingredients":
+            lines.append('  "ingredients": [')
+            for j, ing in enumerate(value):
+                comma = "," if j < len(value) - 1 else ""
+                field, ident = next(iter(ing.items()))
+                lines.append(f'    {{ "{field}": "{ident}" }}{comma}')
+            lines.append("  ]" + tail)
+        elif key == "pattern":
+            lines.append('  "pattern": [')
+            for j, row in enumerate(value):
+                comma = "," if j < len(value) - 1 else ""
+                lines.append(f'    "{row}"{comma}')
+            lines.append("  ]" + tail)
+        elif key == "result":
+            pairs = list(value.items())
+            lines.append('  "result": {')
+            for j, (k, v) in enumerate(pairs):
+                comma = "," if j < len(pairs) - 1 else ""
+                rendered = f'"{v}"' if isinstance(v, str) else v
+                lines.append(f'    "{k}": {rendered}{comma}')
+            lines.append("  }" + tail)
+        else:
+            rendered = f'"{value}"' if isinstance(value, str) else value
+            lines.append(f'  "{key}": {rendered}{tail}')
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def write_recipes(root: Path, recipes) -> None:
+    """Write ``data/weather_realm/recipe/*.json`` from ``bd.building_recipes()``.
+
+    Never deletes anything and is idempotent: byte-identical files are left
+    alone. A name that collides with an existing file of different content is
+    refused, so a hand-authored recipe can never be silently clobbered.
+    """
+    out_dir = root / "src/main/resources/data" / MODID / "recipe"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for name, recipe in recipes.items():
+        path = out_dir / f"{name}.json"
+        if recipe["type"] == "minecraft:smelting":
+            text = json.dumps(recipe, indent=2, ensure_ascii=False) + "\n"
+        else:
+            text = _dump_crafting_recipe(recipe)
+        payload = text.encode("utf-8")
+        if path.exists() and path.read_bytes() != payload:
+            raise SystemExit(
+                f"[gen] refusing to overwrite existing recipe {path} "
+                f"(name collision with different content)")
+        path.write_bytes(payload)
+
+
 # --- entry point -------------------------------------------------------------
 def collect_building_specs():
     """Expand ``bd.BUILDING_FAMILIES`` into concrete block specs.
@@ -657,6 +725,9 @@ def run(root: Path) -> None:
         total += 1
     write_tags(root, covers, specs, bd.THEMES, building_specs)
     write_lang(root, covers, specs, bd.THEMES, building_specs)
+    recipes = bd.building_recipes()
+    write_recipes(root, recipes)
+    print(f"[gen] wrote {len(recipes)} building recipes")
     ZIP.close()
     print(f"[gen] wrote textures + resources for {total} blocks "
           f"({2 * total} block textures) under {root}")

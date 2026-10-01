@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "#": { "item": "weather_realm:deep_fire_stone_bricks" }
+  },
+  "pattern": [
+    "###",
+    "###"
+  ],
+  "result": {
+    "id": "weather_realm:deep_fire_stone_brick_wall",
+    "count": 6
+  }
+}

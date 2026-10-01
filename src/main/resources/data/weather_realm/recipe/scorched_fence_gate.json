@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "group": "wooden_fence_gate",
+  "key": {
+    "#": { "item": "weather_realm:scorched_planks" },
+    "S": { "item": "minecraft:stick" }
+  },
+  "pattern": [
+    "S#S",
+    "S#S"
+  ],
+  "result": {
+    "id": "weather_realm:scorched_fence_gate",
+    "count": 1
+  }
+}

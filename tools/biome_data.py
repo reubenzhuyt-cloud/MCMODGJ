@@ -675,3 +675,120 @@ def all_building_block_ids():
         elif kind == "decoration":
             ids += [f"{fam['prefix']}_{s}" for s in ("glass", "glass_pane", "grate", "chain")]
     return ids
+
+
+# ============================================================================
+# 建筑方块配方（子项目 C / Task C5）
+#   产出形状与数量对齐原版：磨制/砖 2×2→4、雕纹 2 竖→1、柱 2 竖→2、
+#   楼梯 6 合 4、台阶 3 合 6、墙 6 合 6、木板 1 原木→4、木干 4 合 3、
+#   栅栏 3、栅栏门 1、门 3、活板门 2、压力板 1、按钮 1、玻璃（烧炼）、
+#   玻璃板 6 合 16、灯笼 1。裂砖走熔炉（原版惯例）。
+# ============================================================================
+def _shaped(pattern, key, result, count, category, group=None):
+    recipe = {"type": "minecraft:crafting_shaped", "category": category}
+    if group:
+        recipe["group"] = group
+    recipe["key"] = {k: {"item": v} for k, v in key.items()}
+    recipe["pattern"] = pattern
+    recipe["result"] = {"id": result, "count": count}
+    return recipe
+
+
+def _shapeless(ingredients, result, count, category, group=None):
+    recipe = {"type": "minecraft:crafting_shapeless", "category": category}
+    if group:
+        recipe["group"] = group
+    recipe["ingredients"] = [{"item": i} for i in ingredients]
+    recipe["result"] = {"id": result, "count": count}
+    return recipe
+
+
+def _smelting(ingredient, result, category="blocks", group=None,
+              cookingtime=200, experience=0.1):
+    recipe = {"type": "minecraft:smelting", "category": category,
+              "cookingtime": cookingtime, "experience": experience}
+    if group:
+        recipe["group"] = group
+    recipe["ingredient"] = {"item": ingredient}
+    recipe["result"] = {"id": result}
+    return recipe
+
+
+def building_recipes():
+    """Every crafting/smelting recipe for the building blocks, keyed by file name.
+
+    Keys are the recipe file stems (== result id without namespace). The id set
+    is derived from ``STONE_BASES``/``WOOD_BASES``/``_DECORATION_BASES``/
+    ``_LANTERN_BASES`` so names can never drift from what the Java side registers
+    (note the singular ``<base>_brick_stairs`` used by ``_SHALLOW_DERIVED``).
+    ``{prefix}_wood`` and ``stripped_{prefix}_wood`` reuse the pre-existing
+    ``scorched_wood``/``arid_wood`` blocks.
+    """
+    r = {}
+    # --- 石族：每族 20 条（浅层 11 + 深层 9），×3 = 60 ---
+    for fam in STONE_BASES:
+        for base, is_shallow in ((fam["name"], True), (fam["deep"], False)):
+            b = f"{MODID}:{base}"
+            pol, bricks = f"{base}_polished", f"{base}_bricks"
+            r[pol] = _shaped(["##", "##"], {"#": b}, f"{MODID}:{pol}", 4, "building")
+            r[bricks] = _shaped(["##", "##"], {"#": b}, f"{MODID}:{bricks}", 4, "building")
+            r[f"{base}_chiseled"] = _shaped(["#", "#"], {"#": b},
+                                            f"{MODID}:{base}_chiseled", 1, "building")
+            r[f"{pol}_stairs"] = _shaped(["#  ", "## ", "###"], {"#": f"{MODID}:{pol}"},
+                                         f"{MODID}:{pol}_stairs", 4, "building")
+            r[f"{pol}_slab"] = _shaped(["###"], {"#": f"{MODID}:{pol}"},
+                                       f"{MODID}:{pol}_slab", 6, "building")
+            r[f"{pol}_wall"] = _shaped(["###", "###"], {"#": f"{MODID}:{pol}"},
+                                       f"{MODID}:{pol}_wall", 6, "misc")
+            r[f"{base}_brick_stairs"] = _shaped(["#  ", "## ", "###"], {"#": f"{MODID}:{bricks}"},
+                                                f"{MODID}:{base}_brick_stairs", 4, "building")
+            r[f"{base}_brick_slab"] = _shaped(["###"], {"#": f"{MODID}:{bricks}"},
+                                              f"{MODID}:{base}_brick_slab", 6, "building")
+            r[f"{base}_brick_wall"] = _shaped(["###", "###"], {"#": f"{MODID}:{bricks}"},
+                                              f"{MODID}:{base}_brick_wall", 6, "misc")
+            if is_shallow:  # cracked bricks 与 pillar 仅存在于浅层
+                r[f"{base}_pillar"] = _shaped(["#", "#"], {"#": b},
+                                              f"{MODID}:{base}_pillar", 2, "building")
+                r[f"{base}_cracked_bricks"] = _smelting(
+                    f"{MODID}:{bricks}", f"{MODID}:{base}_cracked_bricks")
+    # --- 木族：每族 11 条（含复用既有 {prefix}_wood），×2 = 22 ---
+    for fam in WOOD_BASES:
+        p = fam["prefix"]
+        log = f"{MODID}:{fam['log']}"
+        slog = f"{MODID}:{fam['stripped_log']}"
+        planks = f"{MODID}:{p}_planks"
+        r[f"{p}_planks"] = _shapeless([log], planks, 4, "building", group="planks")
+        r[f"{p}_wood"] = _shaped(["##", "##"], {"#": log},
+                                 f"{MODID}:{p}_wood", 3, "building", group="bark")
+        r[f"stripped_{p}_wood"] = _shaped(["##", "##"], {"#": slog},
+                                          f"{MODID}:stripped_{p}_wood", 3, "building", group="bark")
+        r[f"{p}_stairs"] = _shaped(["#  ", "## ", "###"], {"#": planks},
+                                   f"{MODID}:{p}_stairs", 4, "building", group="wooden_stairs")
+        r[f"{p}_slab"] = _shaped(["###"], {"#": planks},
+                                 f"{MODID}:{p}_slab", 6, "building", group="wooden_slab")
+        r[f"{p}_fence"] = _shaped(["#S#", "#S#"], {"#": planks, "S": "minecraft:stick"},
+                                  f"{MODID}:{p}_fence", 3, "misc", group="wooden_fence")
+        r[f"{p}_fence_gate"] = _shaped(["S#S", "S#S"], {"#": planks, "S": "minecraft:stick"},
+                                       f"{MODID}:{p}_fence_gate", 1, "redstone",
+                                       group="wooden_fence_gate")
+        r[f"{p}_door"] = _shaped(["##", "##", "##"], {"#": planks},
+                                 f"{MODID}:{p}_door", 3, "redstone", group="wooden_door")
+        r[f"{p}_trapdoor"] = _shaped(["###", "###"], {"#": planks},
+                                     f"{MODID}:{p}_trapdoor", 2, "redstone", group="wooden_trapdoor")
+        r[f"{p}_pressure_plate"] = _shaped(["##"], {"#": planks},
+                                           f"{MODID}:{p}_pressure_plate", 1, "redstone",
+                                           group="wooden_pressure_plate")
+        r[f"{p}_button"] = _shapeless([planks], f"{MODID}:{p}_button", 1, "redstone",
+                                      group="wooden_button")
+    # --- 玻璃 / 玻璃板：每主题 2 条，×3 = 6 ---
+    for prefix, *_ in _DECORATION_BASES:
+        r[f"{prefix}_glass"] = _smelting("minecraft:sand", f"{MODID}:{prefix}_glass")
+        r[f"{prefix}_glass_pane"] = _shaped(["###", "###"], {"#": f"{MODID}:{prefix}_glass"},
+                                            f"{MODID}:{prefix}_glass_pane", 16, "misc")
+    # --- 灯笼：3 ---
+    for prefix, *_ in _LANTERN_BASES:
+        r[f"{prefix}_lantern"] = _shaped(
+            ["NNN", "NTN", "NNN"],
+            {"N": "minecraft:iron_nugget", "T": "minecraft:torch"},
+            f"{MODID}:{prefix}_lantern", 1, "misc")
+    return r

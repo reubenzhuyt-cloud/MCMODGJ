@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "#": { "item": "weather_realm:deep_weathered_sandstone_polished" }
+  },
+  "pattern": [
+    "###",
+    "###"
+  ],
+  "result": {
+    "id": "weather_realm:deep_weathered_sandstone_polished_wall",
+    "count": 6
+  }
+}

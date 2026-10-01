@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "group": "wooden_pressure_plate",
+  "key": {
+    "#": { "item": "weather_realm:scorched_planks" }
+  },
+  "pattern": [
+    "##"
+  ],
+  "result": {
+    "id": "weather_realm:scorched_pressure_plate",
+    "count": 1
+  }
+}

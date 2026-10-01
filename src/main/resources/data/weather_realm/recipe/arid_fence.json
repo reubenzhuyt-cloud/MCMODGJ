@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "wooden_fence",
+  "key": {
+    "#": { "item": "weather_realm:arid_planks" },
+    "S": { "item": "minecraft:stick" }
+  },
+  "pattern": [
+    "#S#",
+    "#S#"
+  ],
+  "result": {
+    "id": "weather_realm:arid_fence",
+    "count": 3
+  }
+}

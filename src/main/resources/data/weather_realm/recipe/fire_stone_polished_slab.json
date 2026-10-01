@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "#": { "item": "weather_realm:fire_stone_polished" }
+  },
+  "pattern": [
+    "###"
+  ],
+  "result": {
+    "id": "weather_realm:fire_stone_polished_slab",
+    "count": 6
+  }
+}

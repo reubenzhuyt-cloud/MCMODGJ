@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:smelting",
+  "category": "blocks",
+  "cookingtime": 200,
+  "experience": 0.1,
+  "ingredient": {
+    "item": "weather_realm:fire_stone_bricks"
+  },
+  "result": {
+    "id": "weather_realm:fire_stone_cracked_bricks"
+  }
+}

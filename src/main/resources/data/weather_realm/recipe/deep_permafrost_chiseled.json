@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "#": { "item": "weather_realm:deep_permafrost" }
+  },
+  "pattern": [
+    "#",
+    "#"
+  ],
+  "result": {
+    "id": "weather_realm:deep_permafrost_chiseled",
+    "count": 1
+  }
+}

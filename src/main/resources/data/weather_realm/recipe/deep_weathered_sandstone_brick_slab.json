@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "#": { "item": "weather_realm:deep_weathered_sandstone_bricks" }
+  },
+  "pattern": [
+    "###"
+  ],
+  "result": {
+    "id": "weather_realm:deep_weathered_sandstone_brick_slab",
+    "count": 6
+  }
+}

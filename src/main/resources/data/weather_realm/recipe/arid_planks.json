@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "group": "planks",
+  "ingredients": [
+    { "item": "weather_realm:arid_log" }
+  ],
+  "result": {
+    "id": "weather_realm:arid_planks",
+    "count": 4
+  }
+}

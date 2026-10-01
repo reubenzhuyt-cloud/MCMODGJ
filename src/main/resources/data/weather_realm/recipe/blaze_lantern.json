@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "N": { "item": "minecraft:iron_nugget" },
+    "T": { "item": "minecraft:torch" }
+  },
+  "pattern": [
+    "NNN",
+    "NTN",
+    "NNN"
+  ],
+  "result": {
+    "id": "weather_realm:blaze_lantern",
+    "count": 1
+  }
+}

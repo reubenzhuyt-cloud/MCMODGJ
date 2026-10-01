@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "group": "wooden_slab",
+  "key": {
+    "#": { "item": "weather_realm:scorched_planks" }
+  },
+  "pattern": [
+    "###"
+  ],
+  "result": {
+    "id": "weather_realm:scorched_slab",
+    "count": 6
+  }
+}
