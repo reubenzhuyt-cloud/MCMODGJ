@@ -390,6 +390,43 @@ WOOD_BASES = [
 BUILDING_FAMILIES = []
 
 
+class FamilyDataError(ValueError):
+    """A building-family declaration is malformed (missing/unknown ``kind``)."""
+
+
+def _family_id(fam) -> str:
+    """Best-effort stable identifier for error messages."""
+    for key in ("name", "prefix", "key", "theme"):
+        value = fam.get(key)
+        if value:
+            return str(value)
+    return "<unnamed>"
+
+
+# Every kind the pipeline understands; keep in sync with the dispatch below,
+# in ``gen_block_assets.collect_building_specs`` and in the design doc.
+BUILDING_KINDS = ("stone", "wood", "lantern", "decoration")
+
+
+def family_kind(fam) -> str:
+    """Return ``fam['kind']``, failing loudly when it is absent or unknown.
+
+    Both the verifier (``all_building_block_ids``/``all_building_specs``) and the
+    generator (``gen_block_assets.collect_building_specs``) route through here so
+    a forgotten ``kind`` can never make the verifier green while the generator
+    crashes.
+    """
+    if "kind" not in fam:
+        raise FamilyDataError(
+            f"family '{_family_id(fam)}' missing required field 'kind'")
+    kind = fam["kind"]
+    if kind not in BUILDING_KINDS:
+        raise FamilyDataError(
+            f"family '{_family_id(fam)}' has unknown kind {kind!r} "
+            f"(expected one of {', '.join(BUILDING_KINDS)})")
+    return kind
+
+
 def build_stone_families():
     return list(STONE_BASES)
 
@@ -526,15 +563,32 @@ def wood_specs(family):
     return specs
 
 
+def all_building_specs():
+    """Expanded specs of every family that produces block specs (stone/wood).
+
+    ``lantern``/``decoration`` families are registered as bare ids elsewhere and
+    carry no per-shape spec, so they contribute no tag/tex expectations.
+    """
+    specs = []
+    for fam in BUILDING_FAMILIES:
+        kind = family_kind(fam)
+        if kind == "stone":
+            specs += stone_specs(fam)
+        elif kind == "wood":
+            specs += wood_specs(fam)
+    return specs
+
+
 def all_building_block_ids():
     ids = []
     for fam in BUILDING_FAMILIES:
-        if fam.get("kind") == "stone":
+        kind = family_kind(fam)
+        if kind == "stone":
             ids += [s["name"] for s in stone_specs(fam)]
-        elif fam.get("kind") == "wood":
+        elif kind == "wood":
             ids += [s["name"] for s in wood_specs(fam)]
-        elif fam.get("kind") == "lantern":
+        elif kind == "lantern":
             ids.append(fam["name"])
-        elif fam.get("kind") == "decoration":
+        elif kind == "decoration":
             ids += [f"{fam['prefix']}_{s}" for s in ("glass", "glass_pane", "grate", "chain")]
     return ids

@@ -388,7 +388,10 @@ def write_block_client(root: Path, spec) -> None:
             ("minecraft:block/oak_fence_gate_open", f"{MODID}:block/{name}_open"),
             ("minecraft:block/oak_fence_gate", f"{MODID}:block/{name}")])
     elif model == "door":
-        tex = {"bottom": _tx(spec, "parent"), "top": _tx(spec, "parent")}
+        bottom = _tx(spec, "parent")
+        top_ref = spec.get("tex", {}).get("top")
+        top = f"{MODID}:block/{top_ref}" if top_ref else bottom
+        tex = {"bottom": bottom, "top": top}
         for suffix, parent in (("_bottom_left", "door_bottom_left"),
                                ("_bottom_left_open", "door_bottom_left_open"),
                                ("_bottom_right", "door_bottom_right"),
@@ -457,6 +460,14 @@ def write_block_client(root: Path, spec) -> None:
     if kind is None:
         if model == "cross":
             kind, ref = "generated", f"{MODID}:block/{spec['textures'][0][0]}"
+        elif model == "pane":
+            # No <name>.json block model exists for a pane: the item must be a
+            # standalone sprite. Reuse the pane body texture as layer0.
+            kind, ref = "generated", _tx(spec, "pane")
+        elif model == "lantern":
+            # Vanilla-style lantern item sprite: generated + layer0 pointing at
+            # the lantern block texture (the item is not the block model).
+            kind, ref = "generated", _tx(spec, "lantern")
         else:
             kind, ref = "parent", name
     if kind == "generated":
@@ -596,6 +607,22 @@ def write_lang(root: Path, covers, specs, themes, building_specs) -> None:
 
 
 # --- entry point -------------------------------------------------------------
+def collect_building_specs():
+    """Expand ``bd.BUILDING_FAMILIES`` into concrete block specs.
+
+    ``kind`` is validated through ``bd.family_kind`` so a family missing that
+    required field fails here instead of the verifier silently skipping it.
+    """
+    specs = []
+    for fam in bd.BUILDING_FAMILIES:
+        kind = bd.family_kind(fam)
+        if kind == "stone":
+            specs += bd.stone_specs(fam)
+        elif kind == "wood":
+            specs += bd.wood_specs(fam)
+    return specs
+
+
 def run(root: Path) -> None:
     global ZIP
     jar = find_client_jar(root)
@@ -615,12 +642,7 @@ def run(root: Path) -> None:
             write_block_loot(root, spec)
             total += 1
         write_crystal_item(root, theme)
-    building_specs = []
-    for fam in bd.BUILDING_FAMILIES:
-        if fam["kind"] == "stone":
-            building_specs += bd.stone_specs(fam)
-        elif fam["kind"] == "wood":
-            building_specs += bd.wood_specs(fam)
+    building_specs = collect_building_specs()
     for spec in building_specs:
         write_block_client(root, spec)
         write_block_loot(root, spec)
@@ -639,7 +661,10 @@ def main() -> None:
     args = ap.parse_args()
     if args.client_jar:
         os.environ["MC_CLIENT_JAR"] = args.client_jar
-    run(Path(args.root).resolve())
+    try:
+        run(Path(args.root).resolve())
+    except bd.FamilyDataError as exc:
+        sys.exit(f"[gen] {exc}")
 
 
 ZIP: zipfile.ZipFile | None = None
