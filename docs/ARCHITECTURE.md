@@ -438,12 +438,12 @@ lang 亦为 dict.update merge（`:663-667`），不覆盖手写键。
 
 ### 8.2 静态校验脚本（本次新增）
 
-本仓库**无测试基建**（`src/test/java` 不存在）且团队禁用 `runClient`/`runServer`/`runGameTestServer`，因此自动化门禁以**只用标准库的 Python 静态脚本**为主；三者必须全部 `exit 0`，任一非零即视为门禁失败。
+本仓库**无测试基建**（`src/test/java` 不存在）且团队禁用 `runClient`/`runServer`/`runGameTestServer`，因此自动化门禁以 Python 静态脚本为主（仅生成贴图配色校验需要 Pillow，与 `gen_block_assets` 依赖一致）；三者必须全部 `exit 0`，任一非零即视为门禁失败。
 
 | 脚本 | 断言什么 | 怎么失败 |
 | :- | :- | :- |
 | `tools/verify_tab_coverage.py` | 已注册 item 集合（`ModItems.java` 字面注册 + `ModBlocks` 矿石模板 + `biome_data.all_building_block_ids()`）与 `ModCreativeTabs` 的 `TabCategory` id 表**双向相等**、无重复；恰好 **2 个**页签；每个页签标题键（`itemGroup.*`）在每个 `lang/*.json` 存在 | 缺失/重复/多余 id、页签数 ≠ 2、lang 键缺失；**解析到 0 个 id 直接判失败**（防正则失效后假绿） |
-| `tools/verify_building_assets.py` | `biome_data` 数据表 ↔ `ModBlocks`/`ModItems`/`ModBuildingBlocks`/`ModCreativeTabs` 字面 id ↔ 生成资源（blockstates / 方块与物品模型 / **精确**逐形状文件名 / 掉落表 / 物品贴图）↔ 中英 lang 键；按 spec 的 `tool`/`needs`/`tags` 断言原版标签成员；另有**手写标签保留基线**，防止再生把既有手写 id 冲掉；以及 Java `ModBuildingBlocks.layerWord()` ↔ Python `_ECO_BASES.word` 的**跨语言生态映射一致性**断言（防注册 id ≠ 资源 id） | 任一方向差异、模型文件缺失（按精确 stem，不把 `<name>_stairs` 当 `<name>` 蒙混）、门上下贴图未区分、手写标签被删、生态映射漂移（逐主题点名 Java/Python 两侧值）、数据表出现后缀表 `_BLOCK_MODEL_SUFFIXES` 外的**未知形状**（点名 id + 形状并提示补后缀表）；解析到 0 个 id、0 条 `layerWord` 映射或命名模式自检失败即失败 |
+| `tools/verify_building_assets.py` | `biome_data` 数据表 ↔ `ModBlocks`/`ModItems`/`ModBuildingBlocks`/`ModCreativeTabs` 字面 id ↔ 生成资源（blockstates / 方块与物品模型 / **精确**逐形状文件名 / 掉落表 / 物品贴图）↔ 中英 lang 键；按 spec 的 `tool`/`needs`/`tags` 断言原版标签成员；另有**手写标签保留基线**，防止再生把既有手写 id 冲掉；以及 Java `ModBuildingBlocks.layerWord()` ↔ Python `_ECO_BASES.word` 的**跨语言生态映射一致性**断言（防注册 id ≠ 资源 id）；**石材派生件配色**断言（逐主题逐派生贴图不透明像素均值 HSV 必须贴近其基材贴图，dH≤0.04 / dS≤0.08 / dV≤0.12，带 1e-6 浮点边界容差，摘要打印实际比较张数，任一主题/深浅分组比较数为 0 即失败）；**图案不塌陷**断言（每张派生贴图不透明像素明度标准差 ≥ 0.05 且唯一颜色数 ≥ 4）；**blockstate 属性白名单**断言（每个形状的 variants/multipart 只许用白名单属性键，`layer` 仅 `layers`，可抓非法 `waterlogged`） | 任一方向差异、模型文件缺失（按精确 stem，不把 `<name>_stairs` 当 `<name>` 蒙混）、门上下贴图未区分、手写标签被删、生态映射漂移（逐主题点名 Java/Python 两侧值）、石材配色超差（逐条点名贴图/基材/实际 dH/dS/dV）、石材图案塌陷（点名贴图 + sigma/唯一色数）、blockstate 变体引用白名单外属性（点名文件 + 属性名）、数据表出现后缀表 `_BLOCK_MODEL_SUFFIXES` 外的**未知形状**（点名 id + 形状并提示补后缀表）；解析到 0 个 id、0 条 `layerWord` 映射、0 个 blockstate、0 组石材派生贴图、某主题/深浅分组 0 张派生贴图或命名模式自检失败即失败 |
 | `tools/verify_ore_textures.py` | 复合矿石贴图的**非矿物像素**与其岩石贴图逐像素一致；矿物掩码取自原版矿石 × 原版岩石（stone/deepslate）调色板 | 尺寸/alpha 异常，或背景像素与岩石不一致 |
 
 ### 8.3 本次工程收尾工作流

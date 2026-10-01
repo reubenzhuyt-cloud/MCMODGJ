@@ -17,6 +17,7 @@ import colorsys
 import glob
 import io
 import json
+import math
 import os
 import sys
 import zipfile
@@ -71,8 +72,87 @@ def write_template_blockstate(assets: Path, name: str, template_rel: str,
     path.write_text(text, encoding="utf-8")
 
 
-def recolor(img: Image.Image, profile: dict) -> Image.Image:
-    """Hue/saturation/value recolor. Saturated 'speck' pixels are protected."""
+def image_mean_hsv(img: Image.Image):
+    """Mean ``(hue, sat, val)`` over opaque pixels; hue is a circular mean.
+
+    Returns ``None`` when the image has no opaque pixel.
+    """
+    px = img.load()
+    sx = sy = ss = sv = 0.0
+    n = 0
+    for y in range(img.height):
+        for x in range(img.width):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+            sx += math.cos(2.0 * math.pi * h)
+            sy += math.sin(2.0 * math.pi * h)
+            ss += s
+            sv += v
+            n += 1
+    if n == 0:
+        return None
+    return (math.atan2(sy, sx) / (2.0 * math.pi)) % 1.0, ss / n, sv / n
+
+
+def _hash01(x: int, y: int, seed: int) -> float:
+    """Deterministic 0..1 hash of a pixel coordinate + seed (no RNG state)."""
+    n = (x * 73856093) ^ (y * 19349663) ^ (seed * 83492791)
+    n &= 0xFFFFFFFF
+    n = ((n ^ (n >> 13)) * 1274126177) & 0xFFFFFFFF
+    n ^= n >> 16
+    return (n & 0xFFFFFF) / 0xFFFFFF
+
+
+def _weather(h, s, v, a, x, y, cfg, src_name):
+    """Add deterministic 'wind-eroded wood' detail to one already-recoloured pixel.
+
+    Follows the source sprite's grain direction (``*_log`` -> vertical, planks /
+    doors -> horizontal, ``*_log_top`` -> no grain), darkens with a fixed
+    coordinate hash for rot/bleach spots, and punches a few ``alpha=0`` holes.
+    Pure function of ``(x, y, seed)``: identical output every run.
+    """
+    seed = cfg.get("seed", 0)
+    grain = cfg.get("grain", 0.0)
+    if grain and "log_top" not in src_name:
+        stripe = x if "log" in src_name else y
+        wave = math.sin(2.0 * math.pi * stripe / 4.0
+                        + 0.9 * math.sin(stripe * 1.3 + seed * 0.017))
+        v *= 1.0 - grain * (0.5 + 0.5 * wave)
+    mottle = cfg.get("mottle", 0.0)
+    if mottle:
+        v *= 1.0 - mottle + 2.0 * mottle * _hash01(x, y, seed + 11)
+    spot = cfg.get("spot", 0.0)
+    if spot:
+        cell = _hash01(x // 4, y // 4, seed + 29)
+        if cell < spot:
+            v *= 0.62
+        elif cell > 1.0 - spot:
+            v = 1.0 - (1.0 - v) * 0.75
+    v = min(1.0, max(0.0, v))
+    s = min(1.0, max(0.0, s))
+    holes = cfg.get("holes", 0.0)
+    if holes and a != 0 and _hash01(x, y, seed + 71) < holes:
+        a = 0
+    return h, s, v, a
+
+
+def recolor(img: Image.Image, profile: dict, anchor_base: Image.Image | None = None,
+            src_name: str = "") -> Image.Image:
+    """Hue/saturation/value recolor. Saturated 'speck' pixels are protected.
+
+    Two opt-in extensions, both deterministic:
+
+    * ``profile['anchor_to_base']``: instead of letting the *source* sprite's
+      saturation/value leak through (``val = src_val * val_mul``), map every pixel
+      onto ``anchor_base``'s mean colour while keeping the source's relative
+      lightness/counter-shade (``val = base_val * src_val / mean_src_val`` and the
+      same for saturation). This anchors derived stone pieces to their own base
+      rock's colour family.
+    * ``profile['weather']``: per-pixel procedural weathering (grain, mottle,
+      rot/bleach spots, ``alpha=0`` holes) driven by a coordinate hash.
+    """
     out = img.copy().convert("RGBA")
     px = out.load()
     target_hue = profile.get("target_hue")
@@ -81,19 +161,37 @@ def recolor(img: Image.Image, profile: dict) -> Image.Image:
     val_mul = profile.get("val_mul", 1.0)
     protect_sat = profile.get("protect_sat")
     speck_shift = profile.get("speck_hue_shift", 0.0)
+    anchor = bool(profile.get("anchor_to_base")) and anchor_base is not None
+    weather = profile.get("weather")
+    if anchor:
+        base_stats = image_mean_hsv(anchor_base)
+        src_stats = image_mean_hsv(out)
+        if base_stats is None or src_stats is None:
+            raise ValueError("cannot anchor recolor: empty base/source statistics")
     for y in range(out.height):
         for x in range(out.width):
             r, g, b, a = px[x, y]
             if a == 0:
                 continue
             hh, ss, vv = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
-            if protect_sat is not None and ss >= protect_sat:
+            if anchor:
+                # The source (deepslate) is nearly greyscale, so per-pixel saturation/hue are
+                # noise. Take the base's hue/saturation as the colour family outright and keep
+                # only the source's relative *lightness* (relief / brick seams / cracks):
+                # that makes the derived mean land on the base while retaining the pattern.
+                hh = base_stats[0]
+                ss = base_stats[1]
+                vv = (min(1.0, base_stats[2] * (vv / src_stats[2]))
+                      if src_stats[2] > 0 else base_stats[2])
+            elif protect_sat is not None and ss >= protect_sat:
                 hh = (hh + speck_shift) % 1.0
                 vv = min(1.0, vv * val_mul)
             else:
                 hh = target_hue if target_hue is not None else hh
                 ss = min(1.0, max(ss, sat_floor) * sat_mul)
                 vv = min(1.0, vv * val_mul)
+            if weather is not None:
+                hh, ss, vv, a = _weather(hh, ss, vv, a, x, y, weather, src_name)
             nr, ng, nb = colorsys.hsv_to_rgb(hh, ss, vv)
             px[x, y] = (round(nr * 255), round(ng * 255), round(nb * 255), a)
     return out
@@ -235,22 +333,24 @@ def block_specs(theme):
 
     wn = bd.wood_block_names(theme)
     wsrc = theme["wood_src"]
+    # Weathered wood profiles punch alpha=0 holes, so their pillar models must be cutout.
+    wood_cutout = bool(theme["wood_profile"].get("weather"))
     specs.append(dict(
         name=wn["log"], model="pillar", en=theme["wood_names_en"]["log"], zh=theme["wood_names_zh"]["log"],
-        loot=("self",),
+        loot=("self",), cutout=wood_cutout,
         textures=[(f"{theme['wood']}_log", f"block/{wsrc}_log", theme["wood_profile"]),
                   (f"{theme['wood']}_log_top", f"block/{wsrc}_log_top", theme["wood_profile"])],
         pillar_top=f"{theme['wood']}_log_top", pillar_side=f"{theme['wood']}_log",
     ))
     specs.append(dict(
         name=wn["wood"], model="pillar", en=theme["wood_names_en"]["wood"], zh=theme["wood_names_zh"]["wood"],
-        loot=("self",),
+        loot=("self",), cutout=wood_cutout,
         textures=[(f"{theme['wood']}_log", f"block/{wsrc}_log", theme["wood_profile"])],
         pillar_top=f"{theme['wood']}_log", pillar_side=f"{theme['wood']}_log",
     ))
     specs.append(dict(
         name=wn["stripped_log"], model="pillar", en=theme["wood_names_en"]["stripped_log"],
-        zh=theme["wood_names_zh"]["stripped_log"], loot=("self",),
+        zh=theme["wood_names_zh"]["stripped_log"], loot=("self",), cutout=wood_cutout,
         textures=[(f"stripped_{theme['wood']}_log", f"block/stripped_{wsrc}_log", theme["wood_profile"]),
                   (f"stripped_{theme['wood']}_log_top", f"block/stripped_{wsrc}_log_top", theme["wood_profile"])],
         pillar_top=f"stripped_{theme['wood']}_log_top", pillar_side=f"stripped_{theme['wood']}_log",
@@ -280,6 +380,7 @@ def write_block_client(root: Path, spec) -> None:
     for sub in ("textures/block", "textures/item", "models/block", "models/item", "blockstates"):
         (assets / sub).mkdir(parents=True, exist_ok=True)
     composite = spec.get("composite")
+    rt = {"render_type": "minecraft:cutout"} if spec.get("cutout") else {}
     for out_tex, src_tex, profile in spec.get("textures", []):
         if composite is not None:
             background = Image.open(
@@ -287,19 +388,27 @@ def write_block_client(root: Path, spec) -> None:
             img = compose_ore(read_png(ZIP, src_tex), read_png(ZIP, composite["vanilla_base"]),
                               profile, background)
         else:
-            img = recolor(read_png(ZIP, src_tex), profile)
+            anchor_img = None
+            if profile.get("anchor_to_base"):
+                anchor_path = assets / "textures/block" / f"{profile['anchor_base']}.png"
+                if not anchor_path.is_file():
+                    raise FileNotFoundError(
+                        f"anchor base texture missing for {out_tex}: {anchor_path}")
+                anchor_img = Image.open(anchor_path).convert("RGBA")
+            img = recolor(read_png(ZIP, src_tex), profile, anchor_img, src_tex)
         img.save(assets / "textures/block" / f"{out_tex}.png")
     for out_tex, src_tex, profile in spec.get("item_textures", []):
-        recolor(read_png(ZIP, src_tex), profile).save(assets / "textures/item" / f"{out_tex}.png")
+        recolor(read_png(ZIP, src_tex), profile, None, src_tex).save(
+            assets / "textures/item" / f"{out_tex}.png")
 
     model = spec.get("shape", spec["model"])
     if model == "pillar":
         side, top = spec["pillar_side"], spec["pillar_top"]
         write_json(assets / "models/block" / f"{name}.json", {
-            "parent": "minecraft:block/cube_column",
+            "parent": "minecraft:block/cube_column", **rt,
             "textures": {"end": f"{MODID}:block/{top}", "side": f"{MODID}:block/{side}"}})
         write_json(assets / "models/block" / f"{name}_horizontal.json", {
-            "parent": "minecraft:block/cube_column_horizontal",
+            "parent": "minecraft:block/cube_column_horizontal", **rt,
             "textures": {"end": f"{MODID}:block/{top}", "side": f"{MODID}:block/{side}"}})
         write_json(assets / "blockstates" / f"{name}.json", {"variants": {
             "axis=x": {"model": f"{MODID}:block/{name}_horizontal", "x": 90, "y": 90},
@@ -320,7 +429,8 @@ def write_block_client(root: Path, spec) -> None:
     elif model == "cube_all":
         texture = spec["textures"][0][0]
         write_json(assets / "models/block" / f"{name}.json", {
-            "parent": "minecraft:block/cube_all", "textures": {"all": f"{MODID}:block/{texture}"}})
+            "parent": "minecraft:block/cube_all", **rt,
+            "textures": {"all": f"{MODID}:block/{texture}"}})
         write_json(assets / "blockstates" / f"{name}.json", {"variants": {"": {"model": f"{MODID}:block/{name}"}}})
     elif model == "glass_block":
         write_json(assets / "models/block" / f"{name}.json", {
@@ -338,7 +448,7 @@ def write_block_client(root: Path, spec) -> None:
     elif model == "stairs":
         for suffix, parent in (("", "stairs"), ("_inner", "inner_stairs"), ("_outer", "outer_stairs")):
             write_json(assets / "models/block" / f"{name}{suffix}.json", {
-                "parent": f"minecraft:block/{parent}",
+                "parent": f"minecraft:block/{parent}", **rt,
                 "textures": {"bottom": _tx(spec, "parent"), "side": _tx(spec, "parent"),
                              "top": _tx(spec, "parent")}})
         write_template_blockstate(assets, name, "oak_stairs", [
@@ -347,11 +457,11 @@ def write_block_client(root: Path, spec) -> None:
             ("minecraft:block/oak_stairs", f"{MODID}:block/{name}")])
     elif model == "slab":
         write_json(assets / "models/block" / f"{name}.json", {
-            "parent": "minecraft:block/slab",
+            "parent": "minecraft:block/slab", **rt,
             "textures": {"bottom": _tx(spec, "parent"), "side": _tx(spec, "parent"),
                          "top": _tx(spec, "parent")}})
         write_json(assets / "models/block" / f"{name}_top.json", {
-            "parent": "minecraft:block/slab_top",
+            "parent": "minecraft:block/slab_top", **rt,
             "textures": {"bottom": _tx(spec, "parent"), "side": _tx(spec, "parent"),
                          "top": _tx(spec, "parent")}})
         write_template_blockstate(assets, name, "oak_slab", [
@@ -372,7 +482,8 @@ def write_block_client(root: Path, spec) -> None:
         for suffix, parent in (("_post", "fence_post"), ("_side", "fence_side"),
                                ("_inventory", "fence_inventory")):
             write_json(assets / "models/block" / f"{name}{suffix}.json", {
-                "parent": f"minecraft:block/{parent}", "textures": {"texture": _tx(spec, "parent")}})
+                "parent": f"minecraft:block/{parent}", **rt,
+                "textures": {"texture": _tx(spec, "parent")}})
         write_template_blockstate(assets, name, "oak_fence", [
             ("minecraft:block/oak_fence_post", f"{MODID}:block/{name}_post"),
             ("minecraft:block/oak_fence_side", f"{MODID}:block/{name}_side")])
@@ -381,7 +492,8 @@ def write_block_client(root: Path, spec) -> None:
                                ("_wall", "template_fence_gate_wall"),
                                ("_wall_open", "template_fence_gate_wall_open")):
             write_json(assets / "models/block" / f"{name}{suffix}.json", {
-                "parent": f"minecraft:block/{parent}", "textures": {"texture": _tx(spec, "parent")}})
+                "parent": f"minecraft:block/{parent}", **rt,
+                "textures": {"texture": _tx(spec, "parent")}})
         write_template_blockstate(assets, name, "oak_fence_gate", [
             ("minecraft:block/oak_fence_gate_wall_open", f"{MODID}:block/{name}_wall_open"),
             ("minecraft:block/oak_fence_gate_wall", f"{MODID}:block/{name}_wall"),
@@ -407,7 +519,7 @@ def write_block_client(root: Path, spec) -> None:
                                ("_top_right", "door_top_right"),
                                ("_top_right_open", "door_top_right_open")):
             write_json(assets / "models/block" / f"{name}{suffix}.json", {
-                "parent": f"minecraft:block/{parent}", "textures": tex})
+                "parent": f"minecraft:block/{parent}", **rt, "textures": tex})
         write_template_blockstate(assets, name, "oak_door", [
             (f"minecraft:block/oak_door_{part}", f"{MODID}:block/{name}_{part}")
             for part in ("bottom_left_open", "bottom_left", "bottom_right_open", "bottom_right",
@@ -416,7 +528,8 @@ def write_block_client(root: Path, spec) -> None:
         for suffix, parent in (("_bottom", "template_trapdoor_bottom"),
                                ("_top", "template_trapdoor_top"), ("_open", "template_trapdoor_open")):
             write_json(assets / "models/block" / f"{name}{suffix}.json", {
-                "parent": f"minecraft:block/{parent}", "textures": {"texture": _tx(spec, "parent")}})
+                "parent": f"minecraft:block/{parent}", **rt,
+                "textures": {"texture": _tx(spec, "parent")}})
         write_template_blockstate(assets, name, "oak_trapdoor", [
             ("minecraft:block/oak_trapdoor_bottom", f"{MODID}:block/{name}_bottom"),
             ("minecraft:block/oak_trapdoor_top", f"{MODID}:block/{name}_top"),
@@ -425,14 +538,16 @@ def write_block_client(root: Path, spec) -> None:
         for suffix, parent in (("", "button"), ("_pressed", "button_pressed"),
                                ("_inventory", "button_inventory")):
             write_json(assets / "models/block" / f"{name}{suffix}.json", {
-                "parent": f"minecraft:block/{parent}", "textures": {"texture": _tx(spec, "parent")}})
+                "parent": f"minecraft:block/{parent}", **rt,
+                "textures": {"texture": _tx(spec, "parent")}})
         write_template_blockstate(assets, name, "oak_button", [
             ("minecraft:block/oak_button_pressed", f"{MODID}:block/{name}_pressed"),
             ("minecraft:block/oak_button", f"{MODID}:block/{name}")])
     elif model == "pressure_plate":
         for suffix, parent in (("", "pressure_plate_up"), ("_down", "pressure_plate_down")):
             write_json(assets / "models/block" / f"{name}{suffix}.json", {
-                "parent": f"minecraft:block/{parent}", "textures": {"texture": _tx(spec, "parent")}})
+                "parent": f"minecraft:block/{parent}", **rt,
+                "textures": {"texture": _tx(spec, "parent")}})
         write_template_blockstate(assets, name, "oak_pressure_plate", [
             ("minecraft:block/oak_pressure_plate_down", f"{MODID}:block/{name}_down"),
             ("minecraft:block/oak_pressure_plate", f"{MODID}:block/{name}")])
@@ -475,7 +590,10 @@ def write_block_client(root: Path, spec) -> None:
                 variants[f"facing={facing},waterlogged={str(waterlogged).lower()}"] = variant
         write_json(assets / "blockstates" / f"{name}.json", {"variants": variants})
     elif model == "layer":
-        # Vanilla ``SnowLayerBlock``: layers (1..8) x waterlogged (2) = 16 states.
+        # Vanilla ``SnowLayerBlock`` exposes only ``layers`` (1..8): 8 states, no
+        # ``waterlogged`` property. Emitting a waterlogged dimension produced illegal
+        # variants (``Unknown blockstate property: 'waterlogged'``) and left the block
+        # unrendered. Segment models for 1..7, the full block for 8.
         for height in (2, 4, 6, 8, 10, 12, 14):
             write_json(assets / "models/block" / f"{name}_height{height}.json", {
                 "parent": f"minecraft:block/snow_height{height}",
@@ -487,9 +605,7 @@ def write_block_client(root: Path, spec) -> None:
         variants = {}
         for layers in range(1, 9):
             suffix = f"_{layer_height[layers]}" if layers in layer_height else ""
-            for waterlogged in (False, True):
-                variants[f"layers={layers},waterlogged={str(waterlogged).lower()}"] = {
-                    "model": f"{MODID}:block/{name}{suffix}"}
+            variants[f"layers={layers}"] = {"model": f"{MODID}:block/{name}{suffix}"}
         write_json(assets / "blockstates" / f"{name}.json", {"variants": variants})
     elif model == "spike":
         # Custom ``WeatherSpikeBlock``: thickness (4) x vertical_direction (2) x
@@ -497,11 +613,13 @@ def write_block_client(root: Path, spec) -> None:
         for thickness in ("tip", "frustum", "middle", "base"):
             write_json(assets / "models/block" / f"{name}_{thickness}.json", {
                 "parent": f"minecraft:block/pointed_dripstone_up_{thickness}",
+                "render_type": "minecraft:cutout",
                 "textures": {"cross": f"{MODID}:block/{name}_{thickness}"}})
         # Canonical ``<name>.json`` (the widest segment): the base ``cross`` shape contract
         # the resource verifier checks requires it, and the item model parents it.
         write_json(assets / "models/block" / f"{name}.json", {
             "parent": "minecraft:block/pointed_dripstone_up_base",
+            "render_type": "minecraft:cutout",
             "textures": {"cross": f"{MODID}:block/{name}_base"}})
         variants = {}
         for thickness in ("tip", "frustum", "middle", "base"):

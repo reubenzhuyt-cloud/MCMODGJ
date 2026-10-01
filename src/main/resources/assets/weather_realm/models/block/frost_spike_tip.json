@@ -1,5 +1,6 @@
 {
   "parent": "minecraft:block/pointed_dripstone_up_tip",
+  "render_type": "minecraft:cutout",
   "textures": {
     "cross": "weather_realm:block/frost_spike_tip"
   }

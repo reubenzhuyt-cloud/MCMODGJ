@@ -158,10 +158,18 @@ THEMES = [
                                          protect_sat=0.50, speck_hue_shift=-0.38),
         "wood": "arid",
         "wood_src": "birch",
-        "wood_profile": dict(target_hue=0.090, sat_floor=0.22, sat_mul=1.0, val_mul=0.95,
-                             protect_sat=None, speck_hue_shift=0.0),
-        "leaves_profile": dict(target_hue=0.130, sat_floor=0.35, sat_mul=1.0, val_mul=0.85,
-                               protect_sat=None, speck_hue_shift=0.0),
+        # 风化木:强去饱和、偏灰褐,叠加程序化风化颗粒/朽斑/风蚀孔洞(见
+        # gen_block_assets._weather;纯坐标哈希,确定性、无随机)。含 alpha=0 孔洞,
+        # 因此引用这些贴图的方块模型必须带 render_type:cutout(gen 里按 wood_profile
+        # 是否含 weather 自动加)。
+        "wood_profile": dict(target_hue=0.082, sat_floor=0.08, sat_mul=0.45, val_mul=0.80,
+                             protect_sat=None, speck_hue_shift=0.0,
+                             weather=dict(seed=20261001, grain=0.20, mottle=0.13,
+                                          spot=0.10, holes=0.028)),
+        "leaves_profile": dict(target_hue=0.100, sat_floor=0.12, sat_mul=0.55, val_mul=0.72,
+                               protect_sat=None, speck_hue_shift=0.0,
+                               weather=dict(seed=20261002, grain=0.0, mottle=0.16,
+                                            spot=0.12, holes=0.030)),
         "wood_names_en": {
             "log": "Arid Log", "wood": "Arid Wood",
             "stripped_log": "Stripped Arid Log", "leaves": "Arid Leaves",
@@ -494,6 +502,11 @@ def stone_specs(family):
     for base_name, base_en, base_zh, profile, is_deep in (
             (family["name"], family["en"], family["zh"], family["stone_profile"], False),
             (family["deep"], family["deep_en"], family["deep_zh"], family["deep_profile"], True)):
+        # 派生件锚定到本族基材贴图的色系(见 gen_block_assets.recolor 的
+        # anchor_to_base):深板岩源图很暗很灰,旧逻辑会把派生件拖成灰黑,与浅蓝/米色
+        # 基材脱节。这里用独立 profile 副本,绝不动共享的 stone_profile/deep_profile
+        # (栏灯/玻璃/晶簇/雪层/尖锥仍复用它们)。
+        derived_profile = dict(profile, anchor_to_base=True, anchor_base=base_name)
         derived = _DEEP_DERIVED if is_deep else _SHALLOW_DERIVED
         for suffix, sen, szh, model, has_parent in derived:
             name = f"{base_name}_{suffix}"
@@ -513,11 +526,11 @@ def stone_specs(family):
                 src = {"polished": "block/polished_deepslate", "bricks": "block/deepslate_bricks",
                        "cracked_bricks": "block/cracked_deepslate_bricks",
                        "chiseled": "block/chiseled_deepslate"}[suffix]
-                spec["textures"] = [(name, src, profile)]
+                spec["textures"] = [(name, src, derived_profile)]
                 spec["tex"] = {"parent": name}
             if model == "pillar":
-                spec["textures"] = [(f"{name}", "block/deepslate", profile),
-                                    (f"{name}_top", "block/deepslate_top", profile)]
+                spec["textures"] = [(f"{name}", "block/deepslate", derived_profile),
+                                    (f"{name}_top", "block/deepslate_top", derived_profile)]
                 spec["pillar_side"] = name
                 spec["pillar_top"] = f"{name}_top"
             specs.append(spec)
@@ -546,16 +559,19 @@ _WOOD_DERIVED = [
 
 
 def wood_specs(family):
+    # Weathered wood generates alpha=0 holes -> every model that shows it must be cutout.
+    wood_cutout = bool(family["profile"].get("weather"))
     specs = [dict(name=f"stripped_{family['prefix']}_wood", model="pillar",
                   en=f"Stripped {family['en']} Wood", zh=f"去皮{family['zh']}",
-                  loot=("self",), tool="axe", needs=None, tags=["logs"],
+                  loot=("self",), tool="axe", needs=None, tags=["logs"], cutout=wood_cutout,
                   textures=[], tex={"parent": family["stripped_log"]},
                   pillar_side=family["stripped_log"], pillar_top=family["stripped_log"])]
     for suffix, sen, szh, model in _WOOD_DERIVED:
         name = f"{family['prefix']}_{suffix}"
         spec = dict(name=name, model=model, en=f"{family['en']} {sen}", zh=f"{family['zh']}{szh}",
-                    loot=("self",), tool="axe", needs=None, tags=[], tex={"parent": f"{family['prefix']}_planks"},
-                    textures=[], item=("parent", name))
+                    loot=("self",), tool="axe", needs=None, tags=[],
+                    tex={"parent": f"{family['prefix']}_planks"},
+                    textures=[], item=("parent", name), cutout=wood_cutout)
         if suffix == "planks":
             spec["textures"] = [(name, family["planks_src"], family["profile"])]
             spec["tex"] = {"parent": name}
@@ -669,8 +685,9 @@ def cluster_specs():
 def layer_specs():
     """The 3 layered covers (vanilla ``SnowLayerBlock`` reuse).
 
-    Real blockstate: ``layers`` (1..8) x ``waterlogged`` (2) = 16 combinations. The generated
-    blockstate lists all 16 explicitly (design §6.3 / coordinator ruling).
+    Real blockstate: ``layers`` (1..8) only -- ``SnowLayerBlock`` has no
+    ``waterlogged`` property. The generated blockstate lists all 8 explicitly
+    (design §6.3 / coordinator ruling).
     """
     specs = []
     for prefix, zh, en, profile, word in _ECO_BASES:

@@ -1,5 +1,6 @@
 {
   "parent": "minecraft:block/pointed_dripstone_up_middle",
+  "render_type": "minecraft:cutout",
   "textures": {
     "cross": "weather_realm:block/wind_spike_middle"
   }
