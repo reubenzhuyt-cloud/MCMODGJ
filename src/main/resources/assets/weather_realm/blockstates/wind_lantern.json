@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "hanging=false": {
+      "model": "weather_realm:block/wind_lantern"
+    },
+    "hanging=true": {
+      "model": "weather_realm:block/wind_lantern_hanging"
+    }
+  }
+}

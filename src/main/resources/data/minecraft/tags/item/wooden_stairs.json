@@ -1,6 +1,8 @@
 {
   "replace": false,
   "values": [
-    "weather_realm:frost_stairs"
+    "weather_realm:frost_stairs",
+    "weather_realm:scorched_stairs",
+    "weather_realm:arid_stairs"
   ]
 }

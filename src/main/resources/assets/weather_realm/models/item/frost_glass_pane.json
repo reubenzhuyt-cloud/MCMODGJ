@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "weather_realm:block/frost_glass_pane"
+  }
+}

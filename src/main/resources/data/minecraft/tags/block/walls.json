@@ -1,4 +1,17 @@
 {
   "replace": false,
-  "values": []
+  "values": [
+    "weather_realm:permafrost_polished_wall",
+    "weather_realm:permafrost_brick_wall",
+    "weather_realm:deep_permafrost_polished_wall",
+    "weather_realm:deep_permafrost_brick_wall",
+    "weather_realm:fire_stone_polished_wall",
+    "weather_realm:fire_stone_brick_wall",
+    "weather_realm:deep_fire_stone_polished_wall",
+    "weather_realm:deep_fire_stone_brick_wall",
+    "weather_realm:weathered_sandstone_polished_wall",
+    "weather_realm:weathered_sandstone_brick_wall",
+    "weather_realm:deep_weathered_sandstone_polished_wall",
+    "weather_realm:deep_weathered_sandstone_brick_wall"
+  ]
 }

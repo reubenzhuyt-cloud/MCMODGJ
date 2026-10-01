@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "weather_realm:block/fire_stone_brick_slab"
+    },
+    "type=double": {
+      "model": "weather_realm:block/fire_stone_bricks"
+    },
+    "type=top": {
+      "model": "weather_realm:block/fire_stone_brick_slab_top"
+    }
+  }
+}

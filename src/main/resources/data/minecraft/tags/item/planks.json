@@ -1,6 +1,8 @@
 {
   "replace": false,
   "values": [
-    "weather_realm:frost_planks"
+    "weather_realm:frost_planks",
+    "weather_realm:scorched_planks",
+    "weather_realm:arid_planks"
   ]
 }

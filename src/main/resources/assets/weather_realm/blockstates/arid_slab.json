@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "weather_realm:block/arid_slab"
+    },
+    "type=double": {
+      "model": "weather_realm:block/arid_planks"
+    },
+    "type=top": {
+      "model": "weather_realm:block/arid_slab_top"
+    }
+  }
+}

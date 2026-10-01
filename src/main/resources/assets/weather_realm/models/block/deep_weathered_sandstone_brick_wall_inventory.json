@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/wall_inventory",
+  "textures": {
+    "wall": "weather_realm:block/deep_weathered_sandstone_bricks"
+  }
+}

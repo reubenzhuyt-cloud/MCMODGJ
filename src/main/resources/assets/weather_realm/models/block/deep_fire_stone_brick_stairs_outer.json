@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/outer_stairs",
+  "textures": {
+    "bottom": "weather_realm:block/deep_fire_stone_bricks",
+    "side": "weather_realm:block/deep_fire_stone_bricks",
+    "top": "weather_realm:block/deep_fire_stone_bricks"
+  }
+}

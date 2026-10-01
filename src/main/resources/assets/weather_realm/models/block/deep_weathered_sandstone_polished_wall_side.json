@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/template_wall_side",
+  "textures": {
+    "wall": "weather_realm:block/deep_weathered_sandstone_polished"
+  }
+}

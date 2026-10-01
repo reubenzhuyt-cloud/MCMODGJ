@@ -1,6 +1,8 @@
 {
   "replace": false,
   "values": [
-    "weather_realm:frost_trapdoor"
+    "weather_realm:frost_trapdoor",
+    "weather_realm:scorched_trapdoor",
+    "weather_realm:arid_trapdoor"
   ]
 }

@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "hanging=false": {
+      "model": "weather_realm:block/frost_lantern"
+    },
+    "hanging=true": {
+      "model": "weather_realm:block/frost_lantern_hanging"
+    }
+  }
+}

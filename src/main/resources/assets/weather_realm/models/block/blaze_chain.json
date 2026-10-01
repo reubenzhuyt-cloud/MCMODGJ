@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/chain",
+  "textures": {
+    "all": "weather_realm:block/blaze_chain",
+    "particle": "weather_realm:block/blaze_chain"
+  }
+}

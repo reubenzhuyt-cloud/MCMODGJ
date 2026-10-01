@@ -1,6 +1,8 @@
 {
   "replace": false,
   "values": [
-    "weather_realm:frost_fence_gate"
+    "weather_realm:frost_fence_gate",
+    "weather_realm:scorched_fence_gate",
+    "weather_realm:arid_fence_gate"
   ]
 }

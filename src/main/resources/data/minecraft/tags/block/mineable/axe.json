@@ -19,6 +19,26 @@
     "weather_realm:stripped_scorched_log",
     "weather_realm:arid_log",
     "weather_realm:arid_wood",
-    "weather_realm:stripped_arid_log"
+    "weather_realm:stripped_arid_log",
+    "weather_realm:stripped_scorched_wood",
+    "weather_realm:scorched_planks",
+    "weather_realm:scorched_stairs",
+    "weather_realm:scorched_slab",
+    "weather_realm:scorched_fence",
+    "weather_realm:scorched_fence_gate",
+    "weather_realm:scorched_door",
+    "weather_realm:scorched_trapdoor",
+    "weather_realm:scorched_pressure_plate",
+    "weather_realm:scorched_button",
+    "weather_realm:stripped_arid_wood",
+    "weather_realm:arid_planks",
+    "weather_realm:arid_stairs",
+    "weather_realm:arid_slab",
+    "weather_realm:arid_fence",
+    "weather_realm:arid_fence_gate",
+    "weather_realm:arid_door",
+    "weather_realm:arid_trapdoor",
+    "weather_realm:arid_pressure_plate",
+    "weather_realm:arid_button"
   ]
 }

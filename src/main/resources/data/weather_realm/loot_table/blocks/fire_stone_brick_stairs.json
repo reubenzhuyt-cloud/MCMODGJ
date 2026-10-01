@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "rolls": 1.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "weather_realm:fire_stone_brick_stairs"
+        }
+      ]
+    }
+  ],
+  "random_sequence": "weather_realm:blocks/fire_stone_brick_stairs"
+}

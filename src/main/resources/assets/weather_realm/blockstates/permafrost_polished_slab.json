@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "weather_realm:block/permafrost_polished_slab"
+    },
+    "type=double": {
+      "model": "weather_realm:block/permafrost_polished"
+    },
+    "type=top": {
+      "model": "weather_realm:block/permafrost_polished_slab_top"
+    }
+  }
+}

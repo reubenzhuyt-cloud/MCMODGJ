@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/template_glass_pane_side_alt",
+  "textures": {
+    "pane": "weather_realm:block/frost_grate",
+    "edge": "weather_realm:block/frost_grate"
+  }
+}

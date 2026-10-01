@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "weather_realm:block/permafrost_pillar_top",
+    "side": "weather_realm:block/permafrost_pillar"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/template_glass_pane_noside",
+  "textures": {
+    "pane": "weather_realm:block/frost_glass_pane",
+    "edge": "weather_realm:block/frost_glass_pane_top"
+  }
+}

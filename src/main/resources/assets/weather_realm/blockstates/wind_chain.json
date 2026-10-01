@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "weather_realm:block/wind_chain",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y": {
+      "model": "weather_realm:block/wind_chain"
+    },
+    "axis=z": {
+      "model": "weather_realm:block/wind_chain",
+      "x": 90
+    }
+  }
+}

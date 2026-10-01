@@ -10,6 +10,8 @@
     "weather_realm:stripped_scorched_log",
     "weather_realm:arid_log",
     "weather_realm:arid_wood",
-    "weather_realm:stripped_arid_log"
+    "weather_realm:stripped_arid_log",
+    "weather_realm:stripped_scorched_wood",
+    "weather_realm:stripped_arid_wood"
   ]
 }

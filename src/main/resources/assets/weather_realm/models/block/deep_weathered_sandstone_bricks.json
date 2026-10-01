@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "weather_realm:block/deep_weathered_sandstone_bricks"
+  }
+}

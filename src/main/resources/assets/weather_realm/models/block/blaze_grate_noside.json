@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/template_glass_pane_noside",
+  "textures": {
+    "pane": "weather_realm:block/blaze_grate",
+    "edge": "weather_realm:block/blaze_grate"
+  }
+}

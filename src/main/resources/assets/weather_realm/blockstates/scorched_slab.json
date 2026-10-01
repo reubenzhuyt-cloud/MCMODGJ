@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "weather_realm:block/scorched_slab"
+    },
+    "type=double": {
+      "model": "weather_realm:block/scorched_planks"
+    },
+    "type=top": {
+      "model": "weather_realm:block/scorched_slab_top"
+    }
+  }
+}
