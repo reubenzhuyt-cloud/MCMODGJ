@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """双向断言：建材数据表 ↔ 生成资源 ↔ Java 注册（设计文档 §7.4）。
 
-本脚本**纯静态**：不加载 Minecraft、不启动游戏、不依赖第三方库，只用标准库。
-它把三处来源拆开解析，再做双向对称比较：
+本脚本**纯静态**：不加载 Minecraft、不启动游戏；除生成贴图配色校验需要 Pillow
+（与 `gen_block_assets` 依赖一致）外只用标准库。它把三处来源拆开解析，再做双向对称比较：
 
 * **数据表**——``biome_data.all_building_block_ids()``（族展开后的权威 id 全集）。
 * **Java 注册**——``ModBlocks.java`` / ``ModItems.java`` 的**字面**注册调用
@@ -32,12 +32,19 @@ Phase B 的 ``BUILDING_FAMILIES = []`` 时数据表合法为空，此时两方�
 from __future__ import annotations
 
 import argparse
+import colorsys
 import json
+import math
 import os
 import re
 import sys
 from collections import Counter
 from pathlib import Path
+
+try:
+    from PIL import Image
+except ImportError:  # pragma: no cover - the texture-colour assertion needs it
+    Image = None
 
 # 让中文诊断在 Windows 控制台也按 UTF-8 输出，避免 GBK 编码报错。
 for _stream in (sys.stdout, sys.stderr):
@@ -370,6 +377,287 @@ def door_texture_problems(root: Path, specs, modid: str) -> list:
     return problems
 
 
+# --- Task A: stone derived pieces must match their own base colour -------------------------
+# Every stone derived sprite is recoloured from a *deepslate* source; the old recolor kept
+# the source's saturation/value, so the pieces came out as dark grey while the base rock is
+# pale blue / sand. The generator now anchors them to the base texture's mean colour, and
+# this assertion pins that: each derived texture's opaque-pixel mean HSV must stay within
+# (dH, dS, dV) of its base, *and* the stone relief must not collapse to a flat block.
+# Every theme/depth group that yields 0 sprites is a hard failure, never a green.
+STONE_MAX_DH = 0.04
+STONE_MAX_DS = 0.08
+STONE_MAX_DV = 0.12
+# Float guard for boundary values (e.g. 0.04000000000000004 must not fail). This does NOT
+# relax the limits: 0.04 / 0.08 / 0.12 remain the boundary.
+COLOR_EPS = 1e-6
+# Pattern floor: opaque-pixel value sigma and distinct-colour count. Pre-fix values dipped to
+# sigma ~0.041; repaired sprites sit at ~0.16-0.21 with 4-8 distinct colours, so both floors
+# are safe for the current assets and only catch an actual collapse to a solid block.
+STONE_MIN_VALUE_SIGMA = 0.05
+STONE_MIN_UNIQUE_COLORS = 4
+
+
+def _load_rgba(path: Path, root: Path, problems: list):
+    if not path.is_file():
+        problems.append(f"{_rel(root, path)}: missing texture")
+        return None
+    try:
+        return Image.open(path).convert("RGBA")
+    except Exception as exc:  # pragma: no cover - corrupt png
+        problems.append(f"{_rel(root, path)}: cannot read ({exc})")
+        return None
+
+
+def _mean_hsv(img) -> tuple | None:
+    """Opaque-pixel mean (hue circular, sat, val); ``None`` when fully transparent."""
+    px = img.load()
+    sx = sy = ss = sv = 0.0
+    n = 0
+    for y in range(img.height):
+        for x in range(img.width):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+            sx += math.cos(2.0 * math.pi * h)
+            sy += math.sin(2.0 * math.pi * h)
+            ss += s
+            sv += v
+            n += 1
+    if n == 0:
+        return None
+    return (math.atan2(sy, sx) / (2.0 * math.pi)) % 1.0, ss / n, sv / n
+
+
+def _hue_delta(a: float, b: float) -> float:
+    d = abs(a - b) % 1.0
+    return min(d, 1.0 - d)
+
+
+def _value_sigma(img):
+    """Stddev of opaque-pixel value (0..1); ``None`` when fully transparent."""
+    px = img.load()
+    vals = []
+    for y in range(img.height):
+        for x in range(img.width):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            vals.append(colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)[2])
+    if not vals:
+        return None
+    mean = sum(vals) / len(vals)
+    return math.sqrt(sum((v - mean) ** 2 for v in vals) / len(vals))
+
+
+def _unique_color_count(img):
+    """Number of distinct opaque RGB colours; ``None`` when fully transparent."""
+    px = img.load()
+    colours = set()
+    for y in range(img.height):
+        for x in range(img.width):
+            r, g, b, a = px[x, y]
+            if a != 0:
+                colours.add((r, g, b))
+    return len(colours) if colours else None
+
+
+def stone_pattern_problem(name: str, img) -> str | None:
+    """M2: a problem string when a sprite's relief has collapsed to a flat block, else None."""
+    sigma = _value_sigma(img)
+    colours = _unique_color_count(img)
+    if sigma is None or colours is None:
+        return f"{name}: no opaque pixels"
+    if sigma < STONE_MIN_VALUE_SIGMA - COLOR_EPS:
+        return (f"{name}: pattern collapsed, opaque value sigma={sigma:.4f} "
+                f"< {STONE_MIN_VALUE_SIGMA}")
+    if colours < STONE_MIN_UNIQUE_COLORS:
+        return (f"{name}: pattern collapsed, unique colours={colours} "
+                f"< {STONE_MIN_UNIQUE_COLORS}")
+    return None
+
+
+def stone_color_problems(root: Path, modid: str) -> tuple:
+    """Task A: derived stone sprites vs base mean HSV + pattern-collapse floor.
+
+    Returns ``(problems, summary)``. ``summary`` reports ``compared`` (total sprites),
+    ``over`` (colour violations), ``pattern_over``, ``per_base`` counts and the observed
+    minima. Any theme/depth group that yields 0 sprites raises (a partially deleted data
+    table must not pass on the remaining groups).
+    """
+    if Image is None:
+        raise ParseError("石材配色校验需要 Pillow（pip install Pillow）")
+    tex_dir = ASSETS_REL / modid / "textures/block"
+    problems: list = []
+    compared = 0
+    over = 0
+    pattern_over = 0
+    per_base: dict = {}
+    min_sigma = None
+    min_colours = None
+    for fam in bd.STONE_BASES:
+        for is_deep in (False, True):
+            base_id = fam["deep"] if is_deep else fam["name"]
+            base_path = root / tex_dir / f"{base_id}.png"
+            base_img = _load_rgba(base_path, root, problems)
+            if base_img is None:
+                continue
+            base_mean = _mean_hsv(base_img)
+            if base_mean is None:
+                problems.append(f"{_rel(root, base_path)}: no opaque pixels")
+                continue
+            group_n = 0
+            for spec in bd.stone_specs(fam):
+                name = spec["name"]
+                deep_spec = name == fam["deep"] or name.startswith(fam["deep"] + "_")
+                if deep_spec != is_deep:
+                    continue
+                for out_tex, _src, _profile in spec.get("textures", []):
+                    group_n += 1
+                    compared += 1
+                    path = root / tex_dir / f"{out_tex}.png"
+                    img = _load_rgba(path, root, problems)
+                    if img is None:
+                        continue
+                    m = _mean_hsv(img)
+                    if m is None:
+                        problems.append(f"{_rel(root, path)}: no opaque pixels")
+                        continue
+                    dh = _hue_delta(m[0], base_mean[0])
+                    ds = abs(m[1] - base_mean[1])
+                    dv = abs(m[2] - base_mean[2])
+                    if (dh > STONE_MAX_DH + COLOR_EPS
+                            or ds > STONE_MAX_DS + COLOR_EPS
+                            or dv > STONE_MAX_DV + COLOR_EPS):
+                        over += 1
+                        problems.append(
+                            f"{out_tex}.png: meanHSV=({m[0]:.3f},{m[1]:.3f},{m[2]:.3f}) vs "
+                            f"base {base_id}=({base_mean[0]:.3f},{base_mean[1]:.3f},"
+                            f"{base_mean[2]:.3f}) -> dH={dh:.4f} dS={ds:.4f} dV={dv:.4f} "
+                            f"(max dH<={STONE_MAX_DH} dS<={STONE_MAX_DS} dV<={STONE_MAX_DV})")
+                    pat = stone_pattern_problem(out_tex, img)
+                    if pat is not None:
+                        pattern_over += 1
+                        problems.append(pat)
+                    sigma = _value_sigma(img)
+                    colours = _unique_color_count(img)
+                    if sigma is not None:
+                        min_sigma = sigma if min_sigma is None else min(min_sigma, sigma)
+                    if colours is not None:
+                        min_colours = colours if min_colours is None else min(min_colours, colours)
+            per_base[base_id] = group_n
+            if group_n == 0:
+                raise ParseError(
+                    f"石材配色校验: 基材 {base_id} 解析到 0 张派生贴图（数据表被删小了？）")
+    if compared == 0:
+        raise ParseError("石材配色校验解析到 0 组派生贴图（数据表结构变了？）")
+    summary = {"compared": compared, "over": over, "pattern_over": pattern_over,
+               "per_base": per_base, "min_sigma": min_sigma, "min_colours": min_colours}
+    return problems, summary
+
+
+# --- Task B: blockstate variants may only use a shape's whitelisted properties -------------
+# A generator bug once emitted ``layers=<n>,waterlogged=<bool>`` for vanilla ``SnowLayerBlock``,
+# which has no ``waterlogged`` property -> every layer blockstate was invalid and the blocks
+# rendered invisible. Pin the legal property keys per shape (a superset of the keys vanilla
+# actually lists is fine; anything outside it is a bug). ``layer`` -> ``{layers}`` only.
+_BLOCKSTATE_ALLOWED_PROPS = {
+    "cross": frozenset(),
+    "leaves": frozenset(),
+    "cube_all": frozenset(),
+    "glass_block": frozenset(),
+    "pillar": frozenset({"axis"}),
+    "stairs": frozenset({"facing", "half", "shape", "waterlogged"}),
+    "slab": frozenset({"type", "waterlogged"}),
+    "wall": frozenset({"up", "north", "east", "south", "west", "waterlogged"}),
+    "fence": frozenset({"north", "east", "south", "west", "waterlogged"}),
+    "fence_gate": frozenset({"facing", "in_wall", "open", "powered"}),
+    "door": frozenset({"facing", "half", "hinge", "open", "powered"}),
+    "trapdoor": frozenset({"facing", "half", "open", "powered", "waterlogged"}),
+    "button": frozenset({"face", "facing", "powered"}),
+    "pressure_plate": frozenset({"powered"}),
+    "lantern": frozenset({"hanging", "waterlogged"}),
+    "pane": frozenset({"north", "east", "south", "west", "waterlogged"}),
+    "chain": frozenset({"axis", "waterlogged"}),
+    "cluster": frozenset({"facing", "waterlogged"}),
+    "layer": frozenset({"layers"}),
+    "spike": frozenset({"thickness", "vertical_direction", "waterlogged"}),
+}
+
+
+def _variant_prop_keys(key: str) -> set:
+    keys: set = set()
+    for part in key.split(","):
+        part = part.strip()
+        if "=" in part:
+            keys.add(part.split("=", 1)[0])
+    return keys
+
+
+def _when_prop_keys(when) -> set:
+    keys: set = set()
+    if isinstance(when, str):
+        return _variant_prop_keys(when)
+    if isinstance(when, dict):
+        for key, value in when.items():
+            if key in ("OR", "AND") and isinstance(value, list):
+                for sub in value:
+                    keys |= _when_prop_keys(sub)
+            else:
+                keys.add(key)
+    return keys
+
+
+def _blockstate_prop_keys(data: dict) -> set:
+    keys: set = set()
+    variants = data.get("variants")
+    if isinstance(variants, dict):
+        for variant_key in variants:
+            keys |= _variant_prop_keys(variant_key)
+    multipart = data.get("multipart")
+    if isinstance(multipart, list):
+        for part in multipart:
+            if isinstance(part, dict) and "when" in part:
+                keys |= _when_prop_keys(part["when"])
+    return keys
+
+
+def blockstate_property_problems(root: Path, specs, modid: str) -> list:
+    """Task B: a generated blockstate may only reference its shape's whitelisted properties."""
+    problems: list = []
+    bs_dir = ASSETS_REL / modid / "blockstates"
+    checked = 0
+    for spec in specs:
+        name = spec["name"]
+        shape = real_shape(spec)
+        allowed = _BLOCKSTATE_ALLOWED_PROPS.get(shape)
+        if allowed is None:
+            problems.append(f"{name}: shape {shape!r} missing from blockstate property whitelist")
+            continue
+        path = root / bs_dir / f"{name}.json"
+        if not path.is_file():
+            problems.append(f"{_rel(root, path)}: missing blockstate")
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            problems.append(f"{_rel(root, path)}: invalid JSON ({exc})")
+            continue
+        if not isinstance(data.get("variants"), dict) and not isinstance(data.get("multipart"), list):
+            problems.append(f"{_rel(root, path)}: no variants/multipart")
+            continue
+        checked += 1
+        illegal = sorted(_blockstate_prop_keys(data) - allowed)
+        if illegal:
+            problems.append(
+                f"{_rel(root, path)}: variant uses non-whitelisted propert"
+                f"{'ies' if len(illegal) > 1 else 'y'} {illegal} "
+                f"(shape={shape!r} allowed={sorted(allowed)})")
+    if checked == 0:
+        raise ParseError("blockstate 属性白名单校验解析到 0 个 blockstate（数据表结构变了？）")
+    return problems
+
+
 # --- tag / item-texture expectations (B3 write_tags contract, §9.3) ----------------------
 MC_TAGS_REL = Path("src/main/resources/data/minecraft/tags")
 
@@ -654,6 +942,8 @@ def main() -> None:
         tabs = tab_ids(root)
         langs = lang_keys(root, modid)
         layer_word_diffs = layer_word_problems(root)
+        stone_color_diffs, stone_summary = stone_color_problems(root, modid)
+        blockstate_prop_diffs = blockstate_property_problems(root, building_specs, modid)
     except (ParseError, json.JSONDecodeError, bd.FamilyDataError) as exc:
         print("BUILDING ASSETS FAILED: 解析错误", file=sys.stderr)
         print(f"  - {exc}", file=sys.stderr)
@@ -701,6 +991,15 @@ def main() -> None:
     print(f"[build] lang files   : {', '.join(langs)}")
     print(f"[build] layerWord map : {len(bd._ECO_BASES)} eco themes vs "
           f"ModBuildingBlocks.layerWord ({len(layer_word_diffs)} diff)")
+    print(f"[build] stone colour : base-matched derived sprites "
+          f"(compared {stone_summary['compared']}, {stone_summary['over']} over; "
+          f"per base {stone_summary['per_base']})")
+    print(f"[build] stone pattern : not-collapsed "
+          f"(min value sigma {stone_summary['min_sigma']:.4f}, "
+          f"min colours {stone_summary['min_colours']}, "
+          f"{stone_summary['pattern_over']} over)")
+    print(f"[build] blockstate props : per-shape whitelist "
+          f"({len(blockstate_prop_diffs)} illegal)")
 
     problems = []
     if missing_java:
@@ -723,6 +1022,12 @@ def main() -> None:
         problems.append(("物品贴图缺失", "missing textures/item png", missing_item_tex))
     if layer_word_diffs:
         problems.append(("生态映射漂移", "Java layerWord vs Python _ECO_BASES", layer_word_diffs))
+    if stone_color_diffs:
+        problems.append(("石材配色/图案超差", "derived stone mean HSV or pattern vs base",
+                         stone_color_diffs))
+    if blockstate_prop_diffs:
+        problems.append(("blockstate 属性越界", "variant property outside shape whitelist",
+                         blockstate_prop_diffs))
 
     if problems:
         print("BUILDING ASSETS FAILED", file=sys.stderr)
