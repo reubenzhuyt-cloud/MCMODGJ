@@ -55,6 +55,22 @@ def read_png(zf: zipfile.ZipFile, rel: str) -> Image.Image:
         return Image.open(io.BytesIO(fh.read())).convert("RGBA")
 
 
+def read_text(zf: zipfile.ZipFile, rel: str) -> str:
+    with zf.open(f"assets/minecraft/{rel}") as fh:
+        return fh.read().decode("utf-8")
+
+
+def write_template_blockstate(assets: Path, name: str, template_rel: str,
+                              replacements) -> None:
+    """Copy a vanilla blockstate and rename its model references (longest first)."""
+    text = read_text(ZIP, f"blockstates/{template_rel}.json")
+    for old, new in sorted(replacements, key=lambda r: len(r[0]), reverse=True):
+        text = text.replace(old, new)
+    path = assets / "blockstates" / f"{name}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
 def recolor(img: Image.Image, profile: dict) -> Image.Image:
     """Hue/saturation/value recolor. Saturated 'speck' pixels are protected."""
     out = img.copy().convert("RGBA")
@@ -242,12 +258,17 @@ def block_specs(theme):
 
 
 # --- resource writers --------------------------------------------------------
+def _tx(spec, key):
+    return f"{MODID}:block/{spec['tex'][key]}"
+
+
 def write_block_client(root: Path, spec) -> None:
     assets = root / "src/main/resources/assets" / MODID
     name = spec["name"]
-    (assets / "textures/block").mkdir(parents=True, exist_ok=True)
+    for sub in ("textures/block", "textures/item", "models/block", "models/item", "blockstates"):
+        (assets / sub).mkdir(parents=True, exist_ok=True)
     composite = spec.get("composite")
-    for out_tex, src_tex, profile in spec["textures"]:
+    for out_tex, src_tex, profile in spec.get("textures", []):
         if composite is not None:
             background = Image.open(
                 assets / "textures/block" / f"{composite['background']}.png").convert("RGBA")
@@ -256,52 +277,183 @@ def write_block_client(root: Path, spec) -> None:
         else:
             img = recolor(read_png(ZIP, src_tex), profile)
         img.save(assets / "textures/block" / f"{out_tex}.png")
-    if spec["model"] == "pillar":
+    for out_tex, src_tex, profile in spec.get("item_textures", []):
+        recolor(read_png(ZIP, src_tex), profile).save(assets / "textures/item" / f"{out_tex}.png")
+
+    model = spec["model"]
+    if model == "pillar":
         side, top = spec["pillar_side"], spec["pillar_top"]
         write_json(assets / "models/block" / f"{name}.json", {
             "parent": "minecraft:block/cube_column",
-            "textures": {"end": f"{MODID}:block/{top}", "side": f"{MODID}:block/{side}"},
-        })
+            "textures": {"end": f"{MODID}:block/{top}", "side": f"{MODID}:block/{side}"}})
         write_json(assets / "models/block" / f"{name}_horizontal.json", {
             "parent": "minecraft:block/cube_column_horizontal",
-            "textures": {"end": f"{MODID}:block/{top}", "side": f"{MODID}:block/{side}"},
-        })
-        write_json(assets / "blockstates" / f"{name}.json", {
-            "variants": {
-                "axis=x": {"model": f"{MODID}:block/{name}_horizontal", "x": 90, "y": 90},
-                "axis=y": {"model": f"{MODID}:block/{name}"},
-                "axis=z": {"model": f"{MODID}:block/{name}_horizontal", "x": 90},
-            },
-        })
-    elif spec["model"] == "cross":
+            "textures": {"end": f"{MODID}:block/{top}", "side": f"{MODID}:block/{side}"}})
+        write_json(assets / "blockstates" / f"{name}.json", {"variants": {
+            "axis=x": {"model": f"{MODID}:block/{name}_horizontal", "x": 90, "y": 90},
+            "axis=y": {"model": f"{MODID}:block/{name}"},
+            "axis=z": {"model": f"{MODID}:block/{name}_horizontal", "x": 90}}})
+    elif model == "cross":
         texture = spec["textures"][0][0]
         write_json(assets / "models/block" / f"{name}.json", {
             "parent": "minecraft:block/cross", "render_type": "minecraft:cutout",
-            "textures": {"cross": f"{MODID}:block/{texture}"},
-        })
+            "textures": {"cross": f"{MODID}:block/{texture}"}})
         write_json(assets / "blockstates" / f"{name}.json", {"variants": {"": {"model": f"{MODID}:block/{name}"}}})
-    elif spec["model"] == "leaves":
+    elif model == "leaves":
         texture = spec["textures"][0][0]
         write_json(assets / "models/block" / f"{name}.json", {
             "parent": "minecraft:block/cube_all", "render_type": "minecraft:cutout",
-            "textures": {"all": f"{MODID}:block/{texture}"},
-        })
+            "textures": {"all": f"{MODID}:block/{texture}"}})
         write_json(assets / "blockstates" / f"{name}.json", {"variants": {"": {"model": f"{MODID}:block/{name}"}}})
-    else:  # cube_all
+    elif model == "cube_all":
         texture = spec["textures"][0][0]
         write_json(assets / "models/block" / f"{name}.json", {
-            "parent": "minecraft:block/cube_all",
-            "textures": {"all": f"{MODID}:block/{texture}"},
-        })
+            "parent": "minecraft:block/cube_all", "textures": {"all": f"{MODID}:block/{texture}"}})
         write_json(assets / "blockstates" / f"{name}.json", {"variants": {"": {"model": f"{MODID}:block/{name}"}}})
-
-    if spec["model"] == "cross":
-        write_json(assets / "models/item" / f"{name}.json", {
-            "parent": "minecraft:item/generated",
-            "textures": {"layer0": f"{MODID}:block/{spec['textures'][0][0]}"},
-        })
+    elif model == "glass_block":
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/cube_all", "render_type": "minecraft:translucent",
+            "textures": {"all": _tx(spec, "all")}})
+        write_json(assets / "blockstates" / f"{name}.json", {"variants": {"": {"model": f"{MODID}:block/{name}"}}})
+    elif model == "chain":
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/chain",
+            "textures": {"all": _tx(spec, "all"), "particle": _tx(spec, "all")}})
+        write_json(assets / "blockstates" / f"{name}.json", {"variants": {
+            "axis=x": {"model": f"{MODID}:block/{name}", "x": 90, "y": 90},
+            "axis=y": {"model": f"{MODID}:block/{name}"},
+            "axis=z": {"model": f"{MODID}:block/{name}", "x": 90}}})
+    elif model == "stairs":
+        for suffix, parent in (("", "stairs"), ("_inner", "inner_stairs"), ("_outer", "outer_stairs")):
+            write_json(assets / "models/block" / f"{name}{suffix}.json", {
+                "parent": f"minecraft:block/{parent}",
+                "textures": {"bottom": _tx(spec, "parent"), "side": _tx(spec, "parent"),
+                             "top": _tx(spec, "parent")}})
+        write_template_blockstate(assets, name, "oak_stairs", [
+            ("minecraft:block/oak_stairs_inner", f"{MODID}:block/{name}_inner"),
+            ("minecraft:block/oak_stairs_outer", f"{MODID}:block/{name}_outer"),
+            ("minecraft:block/oak_stairs", f"{MODID}:block/{name}")])
+    elif model == "slab":
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/slab",
+            "textures": {"bottom": _tx(spec, "parent"), "side": _tx(spec, "parent"),
+                         "top": _tx(spec, "parent")}})
+        write_json(assets / "models/block" / f"{name}_top.json", {
+            "parent": "minecraft:block/slab_top",
+            "textures": {"bottom": _tx(spec, "parent"), "side": _tx(spec, "parent"),
+                         "top": _tx(spec, "parent")}})
+        write_template_blockstate(assets, name, "oak_slab", [
+            ("minecraft:block/oak_slab_top", f"{MODID}:block/{name}_top"),
+            ("minecraft:block/oak_planks", _tx(spec, "double")),
+            ("minecraft:block/oak_slab", f"{MODID}:block/{name}")])
+    elif model == "wall":
+        for suffix, parent in (("_post", "template_wall_post"), ("_side", "template_wall_side"),
+                               ("_side_tall", "template_wall_side_tall"),
+                               ("_inventory", "wall_inventory")):
+            write_json(assets / "models/block" / f"{name}{suffix}.json", {
+                "parent": f"minecraft:block/{parent}", "textures": {"wall": _tx(spec, "parent")}})
+        write_template_blockstate(assets, name, "cobblestone_wall", [
+            ("minecraft:block/cobblestone_wall_side_tall", f"{MODID}:block/{name}_side_tall"),
+            ("minecraft:block/cobblestone_wall_side", f"{MODID}:block/{name}_side"),
+            ("minecraft:block/cobblestone_wall_post", f"{MODID}:block/{name}_post")])
+    elif model == "fence":
+        for suffix, parent in (("_post", "fence_post"), ("_side", "fence_side"),
+                               ("_inventory", "fence_inventory")):
+            write_json(assets / "models/block" / f"{name}{suffix}.json", {
+                "parent": f"minecraft:block/{parent}", "textures": {"texture": _tx(spec, "parent")}})
+        write_template_blockstate(assets, name, "oak_fence", [
+            ("minecraft:block/oak_fence_post", f"{MODID}:block/{name}_post"),
+            ("minecraft:block/oak_fence_side", f"{MODID}:block/{name}_side")])
+    elif model == "fence_gate":
+        for suffix, parent in (("", "template_fence_gate"), ("_open", "template_fence_gate_open"),
+                               ("_wall", "template_fence_gate_wall"),
+                               ("_wall_open", "template_fence_gate_wall_open")):
+            write_json(assets / "models/block" / f"{name}{suffix}.json", {
+                "parent": f"minecraft:block/{parent}", "textures": {"texture": _tx(spec, "parent")}})
+        write_template_blockstate(assets, name, "oak_fence_gate", [
+            ("minecraft:block/oak_fence_gate_wall_open", f"{MODID}:block/{name}_wall_open"),
+            ("minecraft:block/oak_fence_gate_wall", f"{MODID}:block/{name}_wall"),
+            ("minecraft:block/oak_fence_gate_open", f"{MODID}:block/{name}_open"),
+            ("minecraft:block/oak_fence_gate", f"{MODID}:block/{name}")])
+    elif model == "door":
+        tex = {"bottom": _tx(spec, "parent"), "top": _tx(spec, "parent")}
+        for suffix, parent in (("_bottom_left", "door_bottom_left"),
+                               ("_bottom_left_open", "door_bottom_left_open"),
+                               ("_bottom_right", "door_bottom_right"),
+                               ("_bottom_right_open", "door_bottom_right_open"),
+                               ("_top_left", "door_top_left"),
+                               ("_top_left_open", "door_top_left_open"),
+                               ("_top_right", "door_top_right"),
+                               ("_top_right_open", "door_top_right_open")):
+            write_json(assets / "models/block" / f"{name}{suffix}.json", {
+                "parent": f"minecraft:block/{parent}", "textures": tex})
+        write_template_blockstate(assets, name, "oak_door", [
+            (f"minecraft:block/oak_door_{part}", f"{MODID}:block/{name}_{part}")
+            for part in ("bottom_left_open", "bottom_left", "bottom_right_open", "bottom_right",
+                         "top_left_open", "top_left", "top_right_open", "top_right")])
+    elif model == "trapdoor":
+        for suffix, parent in (("_bottom", "template_trapdoor_bottom"),
+                               ("_top", "template_trapdoor_top"), ("_open", "template_trapdoor_open")):
+            write_json(assets / "models/block" / f"{name}{suffix}.json", {
+                "parent": f"minecraft:block/{parent}", "textures": {"texture": _tx(spec, "parent")}})
+        write_template_blockstate(assets, name, "oak_trapdoor", [
+            ("minecraft:block/oak_trapdoor_bottom", f"{MODID}:block/{name}_bottom"),
+            ("minecraft:block/oak_trapdoor_top", f"{MODID}:block/{name}_top"),
+            ("minecraft:block/oak_trapdoor_open", f"{MODID}:block/{name}_open")])
+    elif model == "button":
+        for suffix, parent in (("", "button"), ("_pressed", "button_pressed"),
+                               ("_inventory", "button_inventory")):
+            write_json(assets / "models/block" / f"{name}{suffix}.json", {
+                "parent": f"minecraft:block/{parent}", "textures": {"texture": _tx(spec, "parent")}})
+        write_template_blockstate(assets, name, "oak_button", [
+            ("minecraft:block/oak_button_pressed", f"{MODID}:block/{name}_pressed"),
+            ("minecraft:block/oak_button", f"{MODID}:block/{name}")])
+    elif model == "pressure_plate":
+        for suffix, parent in (("", "pressure_plate_up"), ("_down", "pressure_plate_down")):
+            write_json(assets / "models/block" / f"{name}{suffix}.json", {
+                "parent": f"minecraft:block/{parent}", "textures": {"texture": _tx(spec, "parent")}})
+        write_template_blockstate(assets, name, "oak_pressure_plate", [
+            ("minecraft:block/oak_pressure_plate_down", f"{MODID}:block/{name}_down"),
+            ("minecraft:block/oak_pressure_plate", f"{MODID}:block/{name}")])
+    elif model == "lantern":
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/template_lantern", "textures": {"lantern": _tx(spec, "lantern")}})
+        write_json(assets / "models/block" / f"{name}_hanging.json", {
+            "parent": "minecraft:block/template_hanging_lantern",
+            "textures": {"lantern": _tx(spec, "lantern")}})
+        write_template_blockstate(assets, name, "lantern", [
+            ("minecraft:block/lantern_hanging", f"{MODID}:block/{name}_hanging"),
+            ("minecraft:block/lantern", f"{MODID}:block/{name}")])
+    elif model == "pane":
+        for suffix, parent in (("_post", "template_glass_pane_post"), ("_side", "template_glass_pane_side"),
+                               ("_side_alt", "template_glass_pane_side_alt"),
+                               ("_noside", "template_glass_pane_noside"),
+                               ("_noside_alt", "template_glass_pane_noside_alt")):
+            write_json(assets / "models/block" / f"{name}{suffix}.json", {
+                "parent": f"minecraft:block/{parent}",
+                "textures": {"pane": _tx(spec, "pane"), "edge": _tx(spec, "edge")}})
+        write_template_blockstate(assets, name, "glass_pane", [
+            ("minecraft:block/glass_pane_side_alt", f"{MODID}:block/{name}_side_alt"),
+            ("minecraft:block/glass_pane_noside_alt", f"{MODID}:block/{name}_noside_alt"),
+            ("minecraft:block/glass_pane_side", f"{MODID}:block/{name}_side"),
+            ("minecraft:block/glass_pane_noside", f"{MODID}:block/{name}_noside"),
+            ("minecraft:block/glass_pane_post", f"{MODID}:block/{name}_post")])
     else:
-        write_json(assets / "models/item" / f"{name}.json", {"parent": f"{MODID}:block/{name}"})
+        raise ValueError(f"unknown model: {model}")
+
+    kind, ref = spec.get("item", (None, None))
+    if kind is None:
+        if model == "cross":
+            kind, ref = "generated", f"{MODID}:block/{spec['textures'][0][0]}"
+        else:
+            kind, ref = "parent", name
+    if kind == "generated":
+        write_json(assets / "models/item" / f"{name}.json", {
+            "parent": "minecraft:item/generated", "textures": {"layer0": ref}})
+    elif kind == "none":
+        pass
+    else:
+        write_json(assets / "models/item" / f"{name}.json", {"parent": f"{MODID}:block/{ref}"})
 
 
 def write_block_loot(root: Path, spec) -> None:
