@@ -179,6 +179,90 @@ def _rel(root: Path, path: Path) -> str:
         return path.as_posix()
 
 
+# Every block-model file each engine shape must emit (gen_block_assets.write_block_client).
+# These are *exact* stems, not prefix globs: a missing base model must never be masked by
+# a collapsed sibling such as ``<name>_stairs.json``. The derived shapes ``_inner`` /
+# ``_top`` / ``_side`` / ... are still required, list by list.
+_BLOCK_MODEL_SUFFIXES = {
+    "cross": ("",),
+    "leaves": ("",),
+    "cube_all": ("",),
+    "glass_block": ("",),
+    "chain": ("",),
+    "pillar": ("", "_horizontal"),
+    "stairs": ("", "_inner", "_outer"),
+    "slab": ("", "_top"),
+    "wall": ("_post", "_side", "_side_tall", "_inventory"),
+    "fence": ("_post", "_side", "_inventory"),
+    "fence_gate": ("", "_open", "_wall", "_wall_open"),
+    "door": ("_bottom_left", "_bottom_left_open", "_bottom_right", "_bottom_right_open",
+             "_top_left", "_top_left_open", "_top_right", "_top_right_open"),
+    "trapdoor": ("_bottom", "_top", "_open"),
+    "button": ("", "_pressed", "_inventory"),
+    "pressure_plate": ("", "_down"),
+    "lantern": ("", "_hanging"),
+    "pane": ("_post", "_side", "_side_alt", "_noside", "_noside_alt"),
+}
+
+
+def block_model_problems(root: Path, specs, modid: str) -> list:
+    """Each building block's shape must have every *exact* model file on disk."""
+    problems: list = []
+    block_dir_rel = ASSETS_REL / modid / "models/block"
+    for spec in specs:
+        name = spec["name"]
+        model = spec.get("model")
+        suffixes = _BLOCK_MODEL_SUFFIXES.get(model)
+        if suffixes is None:
+            problems.append(f"{name}: unknown model shape {model!r} (verifier out of sync)")
+            continue
+        for suffix in suffixes:
+            rel = block_dir_rel / f"{name}{suffix}.json"
+            if not (root / rel).is_file():
+                problems.append(_rel(root, root / rel))
+    return problems
+
+
+def door_texture_problems(root: Path, specs, modid: str) -> list:
+    """Doors must reference two *distinct* sprites (upper hatch / lower planks).
+
+    Guards the fix that split each wood family's door onto its own
+    ``<prefix>_door_top`` / ``<prefix>_door_bottom`` textures: a regression back to a
+    single shared texture would otherwise still pass every other check.
+    """
+    problems: list = []
+    for spec in specs:
+        if spec.get("model") != "door":
+            continue
+        name = spec["name"]
+        top_ref = spec.get("tex", {}).get("top")
+        bottom_ref = spec.get("tex", {}).get("parent")
+        if not top_ref or not bottom_ref or top_ref == bottom_ref:
+            problems.append(
+                f"{name}: data table top/bottom tex not distinct ({top_ref!r} vs {bottom_ref!r})")
+            continue
+        for suffix in ("_bottom_left", "_top_left"):
+            rel = ASSETS_REL / modid / "models/block" / f"{name}{suffix}.json"
+            path = root / rel
+            if not path.is_file():
+                problems.append(f"{_rel(root, path)}: missing door model")
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                problems.append(f"{_rel(root, path)}: invalid JSON ({exc})")
+                continue
+            got_bottom = data.get("textures", {}).get("bottom")
+            got_top = data.get("textures", {}).get("top")
+            if got_bottom != f"{modid}:block/{bottom_ref}":
+                problems.append(f"{_rel(root, path)}: bottom -> {got_bottom!r} "
+                                f"(expected {modid}:block/{bottom_ref})")
+            if got_top != f"{modid}:block/{top_ref}":
+                problems.append(f"{_rel(root, path)}: top -> {got_top!r} "
+                                f"(expected {modid}:block/{top_ref})")
+    return problems
+
+
 # --- tag / item-texture expectations (B3 write_tags contract, §9.3) ----------------------
 MC_TAGS_REL = Path("src/main/resources/data/minecraft/tags")
 
@@ -209,6 +293,129 @@ def _spec_tag_files() -> dict:
 
 
 _SPEC_TAG_FILES = _spec_tag_files()
+
+
+# --- hand-written tag members the pipeline never generates (retention guard) ---------------
+# The generator only ever *merges* ids into these tag files; it never removes. The ids below
+# are the ones already present in the tags that the pipeline is **not** responsible for
+# generating -- the pre-existing, hand-maintained frost / permafrost / blizzard families and
+# the frost flora. They are pinned here as a frozen baseline so a regeneration (or a bad
+# manual edit) that silently wipes one is caught instead of shipping a shorter tag.
+#
+# This is deliberately a *closed* allow-list: only these known hand-written ids are asserted,
+# never "any unknown id". Ordinary tag additions -- or additions of brand-new hand-written ids
+# -- therefore stay legal. The only way to trip it is to delete one of these specific ids; if
+# such a deletion is intentional, remove the id from this table in the same change.
+_HANDWRITTEN_TAG_MEMBERS = {
+    MC_TAGS_REL / "block/fence_gates.json": {
+        "weather_realm:frost_fence_gate",
+    },
+    MC_TAGS_REL / "block/flowers.json": {
+        "weather_realm:frost_flower", "weather_realm:glacier_bloom", "weather_realm:tall_frost_flower",
+    },
+    MC_TAGS_REL / "block/leaves.json": {
+        "weather_realm:frost_leaves",
+    },
+    MC_TAGS_REL / "block/logs.json": {
+        "weather_realm:frost_log", "weather_realm:frost_wood", "weather_realm:stripped_frost_log",
+        "weather_realm:stripped_frost_wood",
+    },
+    MC_TAGS_REL / "block/mineable/axe.json": {
+        "weather_realm:frost_button", "weather_realm:frost_door", "weather_realm:frost_fence",
+        "weather_realm:frost_fence_gate", "weather_realm:frost_log", "weather_realm:frost_planks",
+        "weather_realm:frost_pressure_plate", "weather_realm:frost_slab", "weather_realm:frost_stairs",
+        "weather_realm:frost_trapdoor", "weather_realm:frost_wood", "weather_realm:stripped_frost_log",
+        "weather_realm:stripped_frost_wood",
+    },
+    MC_TAGS_REL / "block/mineable/hoe.json": {
+        "weather_realm:frost_leaves",
+    },
+    MC_TAGS_REL / "block/mineable/pickaxe.json": {
+        "weather_realm:blizzard_crystal_block", "weather_realm:deep_permafrost", "weather_realm:deep_permafrost_blizzard_crystal_ore",
+        "weather_realm:deep_permafrost_coal_ore", "weather_realm:deep_permafrost_copper_ore", "weather_realm:deep_permafrost_diamond_ore",
+        "weather_realm:deep_permafrost_emerald_ore", "weather_realm:deep_permafrost_gold_ore", "weather_realm:deep_permafrost_iron_ore",
+        "weather_realm:deep_permafrost_lapis_ore", "weather_realm:deep_permafrost_redstone_ore", "weather_realm:permafrost",
+        "weather_realm:permafrost_blizzard_crystal_ore", "weather_realm:permafrost_coal_ore", "weather_realm:permafrost_copper_ore",
+        "weather_realm:permafrost_diamond_ore", "weather_realm:permafrost_emerald_ore", "weather_realm:permafrost_gold_ore",
+        "weather_realm:permafrost_iron_ore", "weather_realm:permafrost_lapis_ore", "weather_realm:permafrost_redstone_ore",
+    },
+    MC_TAGS_REL / "block/needs_diamond_tool.json": {
+        "weather_realm:deep_permafrost_blizzard_crystal_ore", "weather_realm:permafrost_blizzard_crystal_ore",
+    },
+    MC_TAGS_REL / "block/needs_iron_tool.json": {
+        "weather_realm:deep_permafrost_diamond_ore", "weather_realm:deep_permafrost_emerald_ore", "weather_realm:deep_permafrost_gold_ore",
+        "weather_realm:deep_permafrost_redstone_ore", "weather_realm:permafrost_diamond_ore", "weather_realm:permafrost_emerald_ore",
+        "weather_realm:permafrost_gold_ore", "weather_realm:permafrost_redstone_ore",
+    },
+    MC_TAGS_REL / "block/needs_stone_tool.json": {
+        "weather_realm:deep_permafrost_copper_ore", "weather_realm:deep_permafrost_iron_ore", "weather_realm:deep_permafrost_lapis_ore",
+        "weather_realm:permafrost_copper_ore", "weather_realm:permafrost_iron_ore", "weather_realm:permafrost_lapis_ore",
+    },
+    MC_TAGS_REL / "block/planks.json": {
+        "weather_realm:frost_planks",
+    },
+    MC_TAGS_REL / "block/small_flowers.json": {
+        "weather_realm:frost_flower", "weather_realm:glacier_bloom",
+    },
+    MC_TAGS_REL / "block/tall_flowers.json": {
+        "weather_realm:tall_frost_flower",
+    },
+    MC_TAGS_REL / "block/wooden_buttons.json": {
+        "weather_realm:frost_button",
+    },
+    MC_TAGS_REL / "block/wooden_doors.json": {
+        "weather_realm:frost_door",
+    },
+    MC_TAGS_REL / "block/wooden_fences.json": {
+        "weather_realm:frost_fence",
+    },
+    MC_TAGS_REL / "block/wooden_pressure_plates.json": {
+        "weather_realm:frost_pressure_plate",
+    },
+    MC_TAGS_REL / "block/wooden_slabs.json": {
+        "weather_realm:frost_slab",
+    },
+    MC_TAGS_REL / "block/wooden_stairs.json": {
+        "weather_realm:frost_stairs",
+    },
+    MC_TAGS_REL / "block/wooden_trapdoors.json": {
+        "weather_realm:frost_trapdoor",
+    },
+    MC_TAGS_REL / "block/wool.json": {
+        "weather_realm:frost_wool",
+    },
+    MC_TAGS_REL / "item/fence_gates.json": {
+        "weather_realm:frost_fence_gate",
+    },
+    MC_TAGS_REL / "item/logs.json": {
+        "weather_realm:frost_log", "weather_realm:frost_wood", "weather_realm:stripped_frost_log",
+        "weather_realm:stripped_frost_wood",
+    },
+    MC_TAGS_REL / "item/planks.json": {
+        "weather_realm:frost_planks",
+    },
+    MC_TAGS_REL / "item/wooden_buttons.json": {
+        "weather_realm:frost_button",
+    },
+    MC_TAGS_REL / "item/wooden_doors.json": {
+        "weather_realm:frost_door",
+    },
+    MC_TAGS_REL / "item/wooden_fences.json": {
+        "weather_realm:frost_fence",
+    },
+    MC_TAGS_REL / "item/wooden_pressure_plates.json": {
+        "weather_realm:frost_pressure_plate",
+    },
+    MC_TAGS_REL / "item/wooden_slabs.json": {
+        "weather_realm:frost_slab",
+    },
+    MC_TAGS_REL / "item/wooden_stairs.json": {
+        "weather_realm:frost_stairs",
+    },
+    MC_TAGS_REL / "item/wooden_trapdoors.json": {
+        "weather_realm:frost_trapdoor",
+    },
+}
 
 
 def expected_tag_membership(specs) -> dict:
@@ -265,6 +472,33 @@ def tag_problems(root: Path, expected: dict, modid: str) -> list:
             ref = f"{modid}:{bid}"
             if ref not in values:
                 problems.append(f"{_rel(root, path)}: missing '{ref}'")
+    return problems
+
+
+def handwritten_tag_problems(root: Path) -> list:
+    """Pinned hand-written tag members must still be present (retention guard).
+
+    Complements ``tag_problems`` (which only checks that *expected* ids are present) by
+    asserting the ids the pipeline never generates were not wiped by a regeneration.
+    """
+    problems: list = []
+    for rel, refs in sorted(_HANDWRITTEN_TAG_MEMBERS.items()):
+        path = root / rel
+        if not path.is_file():
+            problems.append(
+                f"{_rel(root, path)}: missing tag file (expected {len(refs)} hand-written ids)")
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            problems.append(f"{_rel(root, path)}: invalid JSON ({exc})")
+            continue
+        values = _tag_values(data)
+        for ref in sorted(refs):
+            if ref not in values:
+                problems.append(
+                    f"{_rel(root, path)}: hand-written '{ref}' missing "
+                    f"(regeneration wiped it?)")
     return problems
 
 
@@ -337,15 +571,18 @@ def main() -> None:
         for rel in required:
             if not (root / rel).is_file():
                 missing_resources.append(_rel(root, root / rel))
-        block_dir = root / ASSETS_REL / modid / "models/block"
-        if not list(block_dir.glob(f"{bid}*.json")):
-            missing_resources.append(f"{_rel(root, block_dir)}/{bid}*.json")
         for fname, keys in langs.items():
             key = f"block.{modid}.{bid}"
             if key not in keys:
                 missing_lang.append(f"{fname}: {key}")
 
+    # Exact per-shape block-model files (no prefix globs: a missing base model must
+    # not be masked by a sibling such as ``<name>_stairs.json``).
+    missing_resources += block_model_problems(root, building_specs, modid)
+
     missing_tags = tag_problems(root, expected_tag_membership(building_specs), modid)
+    missing_handwritten_tags = handwritten_tag_problems(root)
+    door_tex_problems = door_texture_problems(root, building_specs, modid)
     missing_item_tex = item_texture_problems(
         root, expected_item_textures(building_specs, modid), modid)
 
@@ -367,6 +604,10 @@ def main() -> None:
         problems.append(("lang 缺失", "missing lang keys", missing_lang))
     if missing_tags:
         problems.append(("标签缺失", "building id missing from vanilla tag", missing_tags))
+    if missing_handwritten_tags:
+        problems.append(("手写标签被删", "hand-written tag member missing", missing_handwritten_tags))
+    if door_tex_problems:
+        problems.append(("门贴图错误", "door top/bottom texture not distinct/wrong", door_tex_problems))
     if missing_item_tex:
         problems.append(("物品贴图缺失", "missing textures/item png", missing_item_tex))
 
