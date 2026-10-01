@@ -26,7 +26,7 @@
 | 永久暴风雪 + 群系级天气过渡 | ✅ | 仅永冻群系降雪，跨群系平滑淡入淡出 |
 | 气候传送门（2×2 水池 + 12 框架 + 碎片点燃） | ✅ | 投掷 `climate_shard` 点燃，双向往返 |
 | 天象祭坛核心 + 调谐基座（天象调控仪 UI） | ✅ | 右键核心打开三态天气调控界面 |
-| 气象祭坛**自然生成** | 🟡 | 结构/模板/战利品俱全，但缺 `structure_set`，当前不会自然刷出 |
+| 气象祭坛**自然生成** | ✅ | 经 5 种原版村庄锚点 `start.nbt` 的 `building_entrance` jigsaw 注入（**不独立生成**、无 `structure_set`；**不回填已生成区块**） |
 | 极域天象图（手持地图） | ✅ | 复用原版地图渲染，仅在天象之境可用 |
 | 《古代天气研究手记》+ Patchouli 四篇 | ✅ | Patchouli 可选，缺失时聊天栏降级 |
 | 坚冰木族 13 件套 + 冰晶装备/工具 | ✅ | 配方齐全 |
@@ -206,7 +206,7 @@
 
 ## 6. 天气祭坛与 Patchouli 手记
 
-### 6.1 天象祭坛 ✅ / 自然生成 🟡
+### 6.1 天象祭坛 ✅ / 自然生成 ✅
 
 | 项 | 内容 | 证据 |
 | :- | :- | :- |
@@ -217,7 +217,9 @@
 | 结构模板 | `weather_altar.nbt` 内含核心 / 基座 / 手记箱 | 已解压 NBT 校验，字符串含 `weather_altar_core` / `weather_pedestal` / `ancient_weather_tome` |
 | **自然生成** | ✅ 随 **5 种原版村庄**（平原 / 雪原 / 沙漠 / 热带草原 / 针叶林）注入：覆盖 `village_{plains,snowy,desert,savanna,taiga}` 结构（仅改 `start_pool`）→ 锚点 `start.nbt` 内 `target=minecraft:building_entrance`、`pool=weather_realm:village/altar_pool` 的 jigsaw → `village/altar_pool` → `weather_altar.nbt` | `data/minecraft/worldgen/structure/village_*.json`、`data/weather_realm/structure/village/*/start.nbt`、`worldgen/template_pool/village/altar_pool.json`；门禁 `tools/verify_village_altar.py` |
 
-> 现状：祭坛会**随 5 种原版村庄自然生成**（僵尸村庄复用同一批村庄结构，经 `zombie` 变体处理，无需额外注入）。注意结构**不回填已生成区块**，旧存档中看不到祭坛属正常。门禁见 `tools/verify_village_altar.py`。
+> 现状：祭坛会**随 5 种原版村庄自然生成**，它**不独立生成**——`worldgen/structure_set/` 中没有 `weather_altar`（`/place structure` 仍可手动放置），而是挂在村庄锚点上。（数据依据：vanilla client jar 的 `data/minecraft/worldgen/structure/` 仅含 5 个 `village_*.json`，僵尸变体是 `village/<type>/zombie/...` 模板池；据此推断僵尸村庄复用同一批村庄结构、无需额外注入——但该运行时选取机制**（未验证）**。）注意结构**不回填已生成区块**，旧存档中看不到祭坛属正常。门禁见 `tools/verify_village_altar.py`。
+>
+> **长期风险**：本 mod 覆盖了原版 5 个 `village_*.json`（仅 `start_pool` 不同）；MC 升版 / 数据包格式变更时这些覆盖会失配，需重新比对（`tools/verify_village_altar.py` 会逐字段比对并报错点名）。
 
 ### 6.2 《古代天气研究手记》与 Patchouli ✅
 
@@ -370,7 +372,7 @@
 
 | # | 事项 | 说明 | 涉及 |
 | :- | :- | :- | :- |
-| R1 | **给气象祭坛接上 `structure_set`** | 目前祭坛不自然生成，是最大「资源白做」问题；注意村庄内注入需 `BiomeModifier`/池接线，勿覆盖原版村庄 | `worldgen/structure_set/weather_altar.json`（新建）、`village/altar_pool.json` 接线 |
+| R1 | ~~给气象祭坛接上 `structure_set`~~ **已具备自然生成** | 祭坛已通过 5 个村庄锚点 NBT 的 `building_entrance` jigsaw 注入全部 5 种原版村庄；**不独立生成**（无 `structure_set`，`/place` 仍可手动放置）。原「勿覆盖原版村庄」的建议与现状相反——现状**正是**覆盖原版 `village_*.json`（仅 `start_pool` 不同） | `data/minecraft/worldgen/structure/village_*.json`、`data/weather_realm/structure/village/*/start.nbt`；门禁 `tools/verify_village_altar.py` |
 | R2 | ~~焦木 / 风化木补齐木板、楼梯、门等衍生件 + 配方~~ **已完成（本次）** | 已与坚冰木族对齐（13 件套 + 配方） | `ModBlocks.java` / `ModBuildingBlocks.java`、`recipe/` |
 | R3 | 燃焰 / 风沙群系补生物或环境机制 | 至少让两片群系「有威胁、有回报」，避免空跑 | `worldgen/biome/*.json` |
 | R4 | 确认 `frost_moss` / `dry_turf` / `volcanic_ash` 是否参与世界生成 | 若否，补地物或改为合成获得 | `placed_feature/` |
@@ -423,7 +425,7 @@
 4. ~~**极域天象图探索进度是否持久化**~~：**已作废**。探索/迷雾机制整体移除（`BiomeMapExplorationState` 已删除），地图改为**服务端噪声采样、范围内全图即时染色**，不再有「探索进度」概念；证据 `map/BiomeMapServerSampler.java`、`client/map/BiomeMapClientData.java:100-115`。
 5. **`weather_altar_core` 的 BER 双层模型是否启用**：✅ 已确认启用。`client/ClientBlockEntityRenderers.java:22` 注册 BER，`:26-28` 通过 `ModelEvent.RegisterAdditional` 加载 shell/inner 两个独立模型。
 6. **模板残留 `Config.java`**：✅ 已删除，替换为 `config/WeatherRealmConfig.java`；其 COMMON/CLIENT 项分别被 `ModNetwork`、`WeatherPortalBlock`、`ClimatePortalHandler` 与 `ClientBlizzardEffects` 读取。
-7. **`weather_altar` 是否自然生成**：✅ **已更正——会生成**。此前误判为「无 `structure_set`，不自然生成」，实际漏看了村庄锚点 `start.nbt` 内的 `building_entrance` jigsaw：本 mod 覆盖 `village_{plains,snowy,desert,savanna,taiga}` 五个结构（仅改 `start_pool`），其锚点注入 `weather_realm:village/altar_pool` → `weather_altar.nbt`，故祭坛随全部 5 种原版村庄生成（僵尸村庄复用同一批结构）。门禁 `tools/verify_village_altar.py`。
+7. **`weather_altar` 是否自然生成**：✅ **已更正——会生成**。此前误判为「无 `structure_set`，不自然生成」，实际漏看了村庄锚点 `start.nbt` 内的 `building_entrance` jigsaw：本 mod 覆盖 `village_{plains,snowy,desert,savanna,taiga}` 五个结构（仅改 `start_pool`），其锚点注入 `weather_realm:village/altar_pool` → `weather_altar.nbt`，故祭坛随全部 5 种原版村庄生成（僵尸村庄复用同一批结构——数据依据为 vanilla client jar 仅含 5 个 `village_*.json`，僵尸变体为 `village/<type>/zombie/...` 模板池；该运行时选取机制**未验证**）。门禁 `tools/verify_village_altar.py`。
 
 ---
 
