@@ -289,6 +289,27 @@ def real_shape(spec) -> str:
     return spec.get("shape", spec.get("model"))
 
 
+def check_known_shapes(specs) -> None:
+    """Fail loudly when a spec declares a shape/model the verifier has no suffixes for.
+
+    ``_BLOCK_MODEL_SUFFIXES`` is the *closed* allow-list of engine shapes the resource
+    check knows how to walk. When a new shape/model appears in the data table without a
+    matching entry here, dispatching on it would leave its derived models unverified
+    (e.g. ``cluster`` / ``layer`` / ``spike`` were once silently missed) -- a false green.
+    Raise instead of skipping, naming every offending id + shape and the fix to apply.
+    """
+    unknown = []
+    for spec in specs:
+        shape = real_shape(spec)
+        if shape not in _BLOCK_MODEL_SUFFIXES:
+            unknown.append((spec.get("name", "<unnamed>"), shape))
+    if unknown:
+        detail = "; ".join(f"{name!r} -> {shape!r}" for name, shape in unknown)
+        raise ParseError(
+            "数据表出现校验器不认识的形状/model 值："
+            f"{detail}；请把该形状的派生模型后缀补进后缀表 _BLOCK_MODEL_SUFFIXES")
+
+
 def block_model_problems(root: Path, specs, modid: str) -> list:
     """Each building block's shape must have every *exact* model file on disk."""
     problems: list = []
@@ -298,7 +319,9 @@ def block_model_problems(root: Path, specs, modid: str) -> list:
         model = real_shape(spec)
         suffixes = _BLOCK_MODEL_SUFFIXES.get(model)
         if suffixes is None:
-            problems.append(f"{name}: unknown model shape {model!r} (verifier out of sync)")
+            problems.append(
+                f"{name}: unknown shape/model {model!r}; "
+                f"请把该形状的派生模型后缀补进后缀表 _BLOCK_MODEL_SUFFIXES")
             continue
         for suffix in suffixes:
             rel = block_dir_rel / f"{name}{suffix}.json"
@@ -626,6 +649,7 @@ def main() -> None:
         _selfcheck_patterns()
         expected = list(bd.all_building_block_ids())
         building_specs = bd.all_building_specs()
+        check_known_shapes(building_specs)
         java_ids, scanned = java_literal_ids(root)
         tabs = tab_ids(root)
         langs = lang_keys(root, modid)
