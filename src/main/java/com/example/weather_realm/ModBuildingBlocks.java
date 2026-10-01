@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.example.weather_realm.block.FrostLogBlock;
+import com.example.weather_realm.block.WeatherSpikeBlock;
 
+import net.minecraft.world.level.block.AmethystClusterBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ButtonBlock;
 import net.minecraft.world.level.block.ChainBlock;
@@ -16,6 +18,7 @@ import net.minecraft.world.level.block.LanternBlock;
 import net.minecraft.world.level.block.PressurePlateBlock;
 import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.SlabBlock;
+import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.TransparentBlock;
@@ -77,10 +80,15 @@ public final class ModBuildingBlocks {
                                 DeferredBlock<ChainBlock> chain) {
     }
 
+    public record EcoSet(String prefix, DeferredBlock<AmethystClusterBlock> cluster,
+                         DeferredBlock<SnowLayerBlock> layer, DeferredBlock<WeatherSpikeBlock> spike) {
+    }
+
     public static final List<StoneFamily> STONE_FAMILIES = new ArrayList<>();
     public static final List<WoodFamily> WOOD_FAMILIES = new ArrayList<>();
     public static final List<LanternSet> LANTERNS = new ArrayList<>();
     public static final List<DecorationSet> DECORATIONS = new ArrayList<>();
+    public static final List<EcoSet> ECO_ITEMS = new ArrayList<>();
 
     private static StoneLayer layer(String name, DeferredBlock<Block> base, BlockBehaviour.Properties props,
                                     boolean deep) {
@@ -176,6 +184,35 @@ public final class ModBuildingBlocks {
         return new DecorationSet(prefix, glass, glassPane, grate, chain);
     }
 
+    private static EcoSet ecoSet(String prefix, MapColor color, int lightLevel,
+                                 SoundType sound, float strength) {
+        DeferredBlock<AmethystClusterBlock> cluster = BLOCKS.register(prefix + "_crystal_cluster",
+                () -> new AmethystClusterBlock(7.0F, 3.0F, BlockBehaviour.Properties.of()
+                        .mapColor(color).forceSolidOn().noOcclusion()
+                        .sound(SoundType.AMETHYST_CLUSTER).strength(strength)
+                        .lightLevel(state -> lightLevel)
+                        .pushReaction(PushReaction.DESTROY)));
+        DeferredBlock<SnowLayerBlock> layer = BLOCKS.register(prefix + "_" + layerWord(prefix) + "_layer",
+                () -> new SnowLayerBlock(BlockBehaviour.Properties.of()
+                        .mapColor(color).strength(0.1F).requiresCorrectToolForDrops()
+                        .sound(sound).isViewBlocking((state, level, pos) -> false)
+                        .isSuffocating((state, level, pos) -> false).noOcclusion()));
+        DeferredBlock<WeatherSpikeBlock> spike = BLOCKS.register(prefix + "_spike",
+                () -> new WeatherSpikeBlock(BlockBehaviour.Properties.of()
+                        .mapColor(color).forceSolidOn().noOcclusion()
+                        .sound(sound).strength(strength)
+                        .pushReaction(PushReaction.DESTROY)));
+        return new EcoSet(prefix, cluster, layer, spike);
+    }
+
+    private static String layerWord(String prefix) {
+        return switch (prefix) {
+            case "frost" -> "snow";
+            case "blaze" -> "ash";
+            default -> "sand";
+        };
+    }
+
     private static void stoneFamily(String themeKey, String shallowName, DeferredBlock<Block> shallowBase,
                                     String deepName, DeferredBlock<Block> deepBase,
                                     BlockBehaviour.Properties shallowProps, BlockBehaviour.Properties deepProps) {
@@ -207,6 +244,10 @@ public final class ModBuildingBlocks {
         DECORATIONS.add(decorationSet("frost", MapColor.ICE));
         DECORATIONS.add(decorationSet("blaze", MapColor.COLOR_ORANGE));
         DECORATIONS.add(decorationSet("wind", MapColor.SAND));
+
+        ECO_ITEMS.add(ecoSet("frost", MapColor.ICE, 7, SoundType.SNOW, 1.5F));
+        ECO_ITEMS.add(ecoSet("blaze", MapColor.COLOR_ORANGE, 3, SoundType.SAND, 1.5F));
+        ECO_ITEMS.add(ecoSet("wind", MapColor.SAND, 0, SoundType.SAND, 1.5F));
     }
 
     public static void register(IEventBus bus) {

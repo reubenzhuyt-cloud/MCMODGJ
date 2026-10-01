@@ -306,6 +306,15 @@ public final class ModItems {
             buildingItem(set.prefix() + "_grate", set.grate());
             buildingItem(set.prefix() + "_chain", set.chain());
         }
+        for (ModBuildingBlocks.EcoSet set : ModBuildingBlocks.ECO_ITEMS) {
+            buildingItem(set.prefix() + "_crystal_cluster", set.cluster());
+            buildingItem(set.prefix() + "_" + switch (set.prefix()) {
+                case "frost" -> "snow";
+                case "blaze" -> "ash";
+                default -> "sand";
+            } + "_layer", set.layer());
+            buildingItem(set.prefix() + "_spike", set.spike());
+        }
     }
 
     public static void register(IEventBus bus) {
