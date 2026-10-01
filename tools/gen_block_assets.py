@@ -572,7 +572,7 @@ def write_tags(root: Path, covers, specs, themes, building_specs) -> None:
     merge_tag(mc_tags / "item/logs.json", mod(logs))
 
 
-def write_lang(root: Path, covers, specs, themes) -> None:
+def write_lang(root: Path, covers, specs, themes, building_specs) -> None:
     lang_dir = root / "src/main/resources/assets" / MODID / "lang"
     en, zh = {}, {}
     for spec in covers:
@@ -584,6 +584,9 @@ def write_lang(root: Path, covers, specs, themes) -> None:
             zh[f"block.{MODID}.{spec['name']}"] = spec["zh"]
         en[f"item.{MODID}.{theme['crystal']}"] = theme["crystal_en"]
         zh[f"item.{MODID}.{theme['crystal']}"] = theme["crystal_zh"]
+    for spec in building_specs:
+        en[f"block.{MODID}.{spec['name']}"] = spec["en"]
+        zh[f"block.{MODID}.{spec['name']}"] = spec["zh"]
 
     for filename, table in (("en_us.json", en), ("zh_cn.json", zh)):
         path = lang_dir / filename
@@ -623,7 +626,7 @@ def run(root: Path) -> None:
         write_block_loot(root, spec)
         total += 1
     write_tags(root, covers, specs, bd.THEMES, building_specs)
-    write_lang(root, covers, specs, bd.THEMES)
+    write_lang(root, covers, specs, bd.THEMES, building_specs)
     ZIP.close()
     print(f"[gen] wrote textures + resources for {total} blocks "
           f"({2 * total} block textures) under {root}")
