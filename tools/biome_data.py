@@ -305,16 +305,39 @@ def self_loot(block):
     }
 
 
-def leaves_loot(block):
-    """Vanilla-style leaf loot: shears/silk-touch drop the leaf, else a stick."""
-    fortune = {
-        "function": "minecraft:set_count",
-        "conditions": [
-            {"condition": "minecraft:table_bonus", "enchantment": "minecraft:fortune",
-             "chances": [0.05, 0.0625, 0.083333336, 0.1]}
+def _leaf_tool_conditions():
+    """``any_of[shears, silk_touch]`` - the tool predicate vanilla uses for leaves."""
+    return {
+        "condition": "minecraft:any_of",
+        "terms": [
+            {"condition": "minecraft:match_tool", "predicate": {"items": "minecraft:shears"}},
+            {
+                "condition": "minecraft:match_tool",
+                "predicate": {
+                    "predicates": {
+                        "minecraft:enchantments": [
+                            {"enchantments": "minecraft:silk_touch", "levels": {"min": 1}}
+                        ]
+                    }
+                },
+            },
         ],
-        "count": 1.0,
     }
+
+
+# Vanilla 1.21.1 fortune chances, copied from data/minecraft/loot_table/blocks/oak_leaves.json.
+SAPLING_FORTUNE_CHANCES = [0.05, 0.0625, 0.083333336, 0.1]
+STICK_FORTUNE_CHANCES = [0.02, 0.022222223, 0.025, 0.033333335, 0.1]
+
+
+def leaves_loot(block, sapling):
+    """Vanilla-style leaf loot: shears / silk touch drop the leaf (or a sapling), else a stick.
+
+    Unlike the old template the fortune ``table_bonus`` conditions live on the *entries* -- putting
+    them on a function's ``conditions`` (as the previous version did) leaves the function inert and
+    makes the drop guaranteed. The stick roll is gated by a pool-level ``inverted`` so an
+    enchanted/sheared tool never yields sticks, exactly like vanilla.
+    """
     return {
         "type": "minecraft:block",
         "pools": [
@@ -327,35 +350,52 @@ def leaves_loot(block):
                         "children": [
                             {
                                 "type": "minecraft:item",
-                                "conditions": [
-                                    {
-                                        "condition": "minecraft:any_of",
-                                        "terms": [
-                                            {"condition": "minecraft:match_tool", "predicate": {"items": "minecraft:shears"}},
-                                            {
-                                                "condition": "minecraft:match_tool",
-                                                "predicate": {
-                                                    "predicates": {
-                                                        "minecraft:enchantments": [
-                                                            {"enchantments": "minecraft:silk_touch", "levels": {"min": 1}}
-                                                        ]
-                                                    }
-                                                },
-                                            },
-                                        ],
-                                    }
-                                ],
+                                "conditions": [_leaf_tool_conditions()],
                                 "name": f"{MODID}:{block}",
                             },
                             {
                                 "type": "minecraft:item",
-                                "conditions": [{"condition": "minecraft:survives_explosion"}],
-                                "name": "minecraft:stick",
-                                "functions": [dict(fortune)],
+                                "conditions": [
+                                    {"condition": "minecraft:survives_explosion"},
+                                    {
+                                        "chances": SAPLING_FORTUNE_CHANCES,
+                                        "condition": "minecraft:table_bonus",
+                                        "enchantment": "minecraft:fortune",
+                                    },
+                                ],
+                                "name": f"{MODID}:{sapling}",
                             },
                         ],
                     }
                 ],
+            },
+            {
+                "bonus_rolls": 0.0,
+                "conditions": [
+                    {"condition": "minecraft:inverted", "term": _leaf_tool_conditions()}
+                ],
+                "entries": [
+                    {
+                        "type": "minecraft:item",
+                        "conditions": [
+                            {
+                                "chances": STICK_FORTUNE_CHANCES,
+                                "condition": "minecraft:table_bonus",
+                                "enchantment": "minecraft:fortune",
+                            }
+                        ],
+                        "functions": [
+                            {
+                                "add": False,
+                                "count": {"type": "minecraft:uniform", "max": 2.0, "min": 1.0},
+                                "function": "minecraft:set_count",
+                            },
+                            {"function": "minecraft:explosion_decay"},
+                        ],
+                        "name": "minecraft:stick",
+                    }
+                ],
+                "rolls": 1.0,
             },
         ],
         "random_sequence": f"{MODID}:blocks/{block}",
