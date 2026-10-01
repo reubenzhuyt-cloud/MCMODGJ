@@ -5,17 +5,29 @@ Fails loudly (non-zero exit + named files/fields) if any link of the chain is
 broken.  It parses the real reexported structures, template pools and anchor
 NBT files; it never silently skips.
 
+Exit codes
+----------
+* ``0``  gate passed.
+* ``1``  gate failure (a link of the altar-injection chain is broken).
+* ``2``  environment failure (e.g. the vanilla client jar could not be found).
+         Printed with an ``[ENV]`` prefix so a missing jar is never mistaken
+         for a broken chain.
+
 Checks
 ------
 1. All five vanilla village structure overrides exist under
    ``data/minecraft/worldgen/structure/`` and each one differs from the vanilla
    jar original *only* by ``start_pool`` (field-by-field comparison).
 2. Each override's ``start_pool`` template pool file exists.
-3. That pool's anchor ``.nbt`` exists and contains both
-   ``pool=weather_realm:village/altar_pool`` and
-   ``pool=minecraft:village/<type>/town_centers`` jigsaw blocks.
-4. ``weather_realm:village/altar_pool`` exists and its ``weather_altar.nbt``
-   exists.
+3. That pool's anchor ``.nbt`` exists and, **on the same jigsaw block**:
+   (a) some block has ``target=minecraft:building_entrance`` **and**
+       ``pool=weather_realm:village/altar_pool``;
+   (b) some block has ``target=minecraft:street`` **and**
+       ``pool=minecraft:village/<type>/town_centers``.
+4. ``weather_realm:village/altar_pool`` exists, its ``weather_altar.nbt`` exists,
+   and that NBT carries the receiving jigsaw
+   ``name=minecraft:building_entrance`` (vanilla ``JigsawBlock.canAttach``
+   requires ``parent.target == child.name``).
 5. Every jigsaw ``pool`` string found in those NBT files resolves to an
    existing template pool (mod pools in the repo, ``minecraft:`` pools in the
    vanilla client jar); unresolved pools are named.
@@ -25,11 +37,9 @@ Checks
 """
 from __future__ import annotations
 
-import gzip
-import io
+import glob
 import json
 import os
-import struct
 import sys
 import zipfile
 from pathlib import Path
@@ -46,17 +56,19 @@ SOUNDS_JSON = RESOURCES / "assets" / MODID / "sounds.json"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
     import make_village_start_nbt as nbtlib
-except Exception as exc:  # pragma: no cover - hard failure is the point
-    sys.exit(f"[verify_village_altar] cannot import NBT library: {exc}")
+except Exception as exc:  # pragma: no cover - environment/tooling failure
+    print(f"[ENV] [verify_village_altar] cannot import NBT library: {exc}", file=sys.stderr)
+    raise SystemExit(2)
 
 # --- expected chain ---------------------------------------------------------
 VILLAGE_TYPES = ["plains", "snowy", "desert", "savanna", "taiga"]
 ALTAR_POOL = "weather_realm:village/altar_pool"
 ALTAR_NBT_ID = "weather_realm:weather_altar"
+ALTAR_TARGET = "minecraft:building_entrance"
+STREET_TARGET = "minecraft:street"
 BIOMES = ["crystal_plains", "arid_wasteland", "blazing_plains"]
 
 failures: list[str] = []
-notes: list[str] = []
 
 
 def fail(msg: str) -> None:
@@ -68,8 +80,6 @@ def find_client_jar() -> Path:
     candidates = []
     if override:
         candidates.append(Path(override))
-    import glob
-
     home = Path.home()
     candidates += [
         Path(p)
@@ -80,10 +90,12 @@ def find_client_jar() -> Path:
     for c in candidates:
         if c.is_file():
             return c
-    sys.exit(
-        "[verify_village_altar] cannot find the vanilla client jar; "
-        "pass MC_CLIENT_JAR or download the 1.21.1 client."
+    print(
+        "[ENV] [verify_village_altar] cannot find the vanilla client jar; "
+        "pass MC_CLIENT_JAR or download the 1.21.1 client.",
+        file=sys.stderr,
     )
+    raise SystemExit(2)
 
 
 def split_id(rid: str):
@@ -91,6 +103,16 @@ def split_id(rid: str):
         return "minecraft", rid
     ns, path = rid.split(":", 1)
     return ns, path
+
+
+def jigsaw_fields(j: dict) -> tuple:
+    """Return ``(name, target, pool)`` (each str or None) of a jigsaw compound."""
+
+    def s(key):
+        tag = j.get(key)
+        return tag[1] if tag is not None and tag[0] == nbtlib.TAG_STRING else None
+
+    return s("name"), s("target"), s("pool")
 
 
 # --- pool resolution --------------------------------------------------------
@@ -190,6 +212,8 @@ def main() -> int:
         nbt_parsed = 0
         all_pools: list[tuple[str, str]] = []  # (pool, source description)
         anchor_pools = 0
+        conj_altar_ok = 0
+        conj_street_ok = 0
         for village_type in VILLAGE_TYPES:
             pool_id = f"{MODID}:village/{village_type}/start"
             pool_path = mod_pool_path(pool_id)
@@ -213,37 +237,36 @@ def main() -> int:
                     fail(f"[3] cannot parse {nbt_path.relative_to(REPO)}: {exc}")
                     continue
                 nbt_parsed += 1
-                pools = {
-                    j.get("pool")[1]
-                    for j in jigsaws
-                    if j.get("pool") is not None and j["pool"][0] == nbtlib.TAG_STRING
-                }
-                targets = {
-                    j.get("target")[1]
-                    for j in jigsaws
-                    if j.get("target") is not None and j["target"][0] == nbtlib.TAG_STRING
-                }
+                rel = str(nbt_path.relative_to(REPO))
+                fields = [jigsaw_fields(j) for j in jigsaws]
                 expected_town = f"minecraft:village/{village_type}/town_centers"
-                if ALTAR_POOL not in pools:
-                    fail(f"[3] {nbt_path.relative_to(REPO)} has no jigsaw pool={ALTAR_POOL}")
-                if "minecraft:building_entrance" not in targets:
+                # Conjunction (a): ONE block carries both altar target + pool.
+                if any(t == ALTAR_TARGET and p == ALTAR_POOL for (_n, t, p) in fields):
+                    conj_altar_ok += 1
+                else:
                     fail(
-                        f"[3] {nbt_path.relative_to(REPO)} has no jigsaw "
-                        f"target=minecraft:building_entrance"
+                        f"[3] {rel}: no single jigsaw with target={ALTAR_TARGET} "
+                        f"AND pool={ALTAR_POOL}; jigsaws={fields}"
                     )
-                if expected_town not in pools:
+                # Conjunction (b): ONE block carries both street target + pool.
+                if any(t == STREET_TARGET and p == expected_town for (_n, t, p) in fields):
+                    conj_street_ok += 1
+                else:
                     fail(
-                        f"[3] {nbt_path.relative_to(REPO)} has no jigsaw "
-                        f"pool={expected_town}"
+                        f"[3] {rel}: no single jigsaw with target={STREET_TARGET} "
+                        f"AND pool={expected_town}; jigsaws={fields}"
                     )
-                for p in pools:
-                    all_pools.append((p, str(nbt_path.relative_to(REPO))))
+                for (_n, _t, p) in fields:
+                    if p:
+                        all_pools.append((p, rel))
                 anchor_pools += 1
 
         if nbt_parsed == 0:
             fail("[7] parsed 0 anchor NBT files")
 
-        # --- check 4: altar pool -> weather_altar.nbt ----------------------
+        # --- check 4: altar pool -> weather_altar.nbt (+ receiver jigsaw) --
+        altar_nbt_parsed = 0
+        receiver_ok = 0
         altar_pool_path = mod_pool_path(ALTAR_POOL)
         if not altar_pool_path.is_file():
             fail(f"[4] missing altar pool: {altar_pool_path.relative_to(REPO)}")
@@ -267,10 +290,24 @@ def main() -> int:
                     fail(f"[4] cannot parse {altar_nbt.relative_to(REPO)}: {exc}")
                     continue
                 nbt_parsed += 1
-                for j in jigsaws:
-                    pool_tag = j.get("pool")
-                    if pool_tag is not None and pool_tag[0] == nbtlib.TAG_STRING:
-                        all_pools.append((pool_tag[1], str(altar_nbt.relative_to(REPO))))
+                altar_nbt_parsed += 1
+                rel = str(altar_nbt.relative_to(REPO))
+                fields = [jigsaw_fields(j) for j in jigsaws]
+                names = [n for (n, _t, _p) in fields if n]
+                if ALTAR_TARGET in names:
+                    receiver_ok += 1
+                else:
+                    fail(
+                        f"[4] {rel}: no receiving jigsaw name={ALTAR_TARGET} "
+                        f"(anchor targets require it for JigsawBlock.canAttach); "
+                        f"jigsaw names={names}"
+                    )
+                for (_n, _t, p) in fields:
+                    if p:
+                        all_pools.append((p, rel))
+
+        if altar_nbt_parsed == 0:
+            fail("[7] parsed 0 altar NBT files")
 
         # --- check 5: resolve every referenced pool ------------------------
         resolved_pools = set()
@@ -286,6 +323,9 @@ def main() -> int:
         except Exception as exc:
             sounds = {}
             fail(f"[6] cannot read {SOUNDS_JSON.relative_to(REPO)}: {exc}")
+        if not isinstance(sounds, dict):
+            fail(f"[6] {SOUNDS_JSON.relative_to(REPO)} is not a JSON object")
+            sounds = {}
         for biome in BIOMES:
             biome_path = MOD_BIOME_DIR / f"{biome}.json"
             if not biome_path.is_file():
@@ -296,13 +336,32 @@ def main() -> int:
             except Exception as exc:
                 fail(f"[6] {biome_path.relative_to(REPO)} is not valid JSON: {exc}")
                 continue
-            music = biome_obj.get("effects", {}).get("music")
-            if not music:
+            if not isinstance(biome_obj, dict):
+                fail(f"[6] {biome_path.relative_to(REPO)} is not a JSON object")
+                continue
+            effects = biome_obj.get("effects")
+            if not isinstance(effects, dict):
+                fail(f"[6] {biome_path.relative_to(REPO)}: effects is not a JSON object")
+                continue
+            music = effects.get("music")
+            if music is None:
                 fail(f"[6] {biome_path.relative_to(REPO)}: effects.music is missing")
                 continue
+            if not isinstance(music, dict):
+                fail(
+                    f"[6] {biome_path.relative_to(REPO)}: effects.music is "
+                    f"{type(music).__name__}, expected a JSON object"
+                )
+                continue
             sound = music.get("sound")
-            if not sound:
+            if sound is None:
                 fail(f"[6] {biome_path.relative_to(REPO)}: effects.music.sound is missing")
+                continue
+            if not isinstance(sound, str):
+                fail(
+                    f"[6] {biome_path.relative_to(REPO)}: effects.music.sound is "
+                    f"{type(sound).__name__}, expected a string"
+                )
                 continue
             _ns, path = split_id(sound)
             if path not in sounds:
@@ -315,11 +374,16 @@ def main() -> int:
     print("[verify_village_altar] parsed:")
     print(f"  village structures : {villages_checked}/{len(VILLAGE_TYPES)}")
     print(f"  anchor NBT files   : {anchor_pools}/{len(VILLAGE_TYPES)}")
+    print(
+        f"  same-block conjunctions : altar {conj_altar_ok}/{len(VILLAGE_TYPES)}, "
+        f"street {conj_street_ok}/{len(VILLAGE_TYPES)}"
+    )
+    print(
+        f"  altar receiver jigsaw   : {receiver_ok}/{altar_nbt_parsed} "
+        f"(name={ALTAR_TARGET})"
+    )
     print(f"  NBT files parsed   : {nbt_parsed}")
     print(f"  jigsaw pools seen  : {len(all_pools)} references, {len(resolved_pools)} distinct resolved")
-    if notes:
-        for n in notes:
-            print(f"  note: {n}")
 
     if failures:
         print("[verify_village_altar] FAIL:")
