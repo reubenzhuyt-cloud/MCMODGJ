@@ -179,6 +179,123 @@ def _rel(root: Path, path: Path) -> str:
         return path.as_posix()
 
 
+# --- tag / item-texture expectations (B3 write_tags contract, §9.3) ----------------------
+MC_TAGS_REL = Path("src/main/resources/data/minecraft/tags")
+
+_TOOL_TAG_FILES = {
+    "pickaxe": MC_TAGS_REL / "block/mineable/pickaxe.json",
+    "axe": MC_TAGS_REL / "block/mineable/axe.json",
+    "shovel": MC_TAGS_REL / "block/mineable/shovel.json",
+}
+_NEEDS_TAG_FILES = {
+    "stone": MC_TAGS_REL / "block/needs_stone_tool.json",
+    "iron": MC_TAGS_REL / "block/needs_iron_tool.json",
+    "diamond": MC_TAGS_REL / "block/needs_diamond_tool.json",
+}
+
+
+def _spec_tag_files() -> dict:
+    """spec ``tags`` key -> the vanilla tag file(s) ``write_tags`` must add it to."""
+    table = {
+        "walls": (MC_TAGS_REL / "block/walls.json",),
+        "logs": (MC_TAGS_REL / "block/logs.json", MC_TAGS_REL / "item/logs.json"),
+    }
+    for key in ("planks", "wooden_stairs", "wooden_slabs", "wooden_fences",
+                "fence_gates", "wooden_doors", "wooden_trapdoors",
+                "wooden_pressure_plates", "wooden_buttons"):
+        table[key] = (MC_TAGS_REL / "block" / f"{key}.json",
+                      MC_TAGS_REL / "item" / f"{key}.json")
+    return table
+
+
+_SPEC_TAG_FILES = _spec_tag_files()
+
+
+def expected_tag_membership(specs) -> dict:
+    """Map each expected tag file (repo-relative) to the block ids it must contain.
+
+    Derived purely from the family spec fields (``tool`` / ``needs`` / ``tags``),
+    mirroring ``gen_block_assets.write_tags``.
+    """
+    out: dict = {}
+
+    def add(path: Path, name: str) -> None:
+        out.setdefault(path, set()).add(name)
+
+    for spec in specs:
+        name = spec["name"]
+        tool = spec.get("tool")
+        if tool in _TOOL_TAG_FILES:
+            add(_TOOL_TAG_FILES[tool], name)
+        needs = spec.get("needs")
+        if needs in _NEEDS_TAG_FILES:
+            add(_NEEDS_TAG_FILES[needs], name)
+        for tag in spec.get("tags", []):
+            for path in _SPEC_TAG_FILES.get(tag, ()):
+                add(path, name)
+    return out
+
+
+def _tag_values(data) -> set:
+    values: set = set()
+    for entry in data.get("values", []):
+        if isinstance(entry, str):
+            values.add(entry)
+        elif isinstance(entry, dict) and isinstance(entry.get("id"), str):
+            values.add(entry["id"])
+    return values
+
+
+def tag_problems(root: Path, expected: dict, modid: str) -> list:
+    """Every expected id must be present in its tag file; missing -> problem."""
+    problems: list = []
+    for rel, ids in sorted(expected.items()):
+        path = root / rel
+        if not path.is_file():
+            problems.append(
+                f"{_rel(root, path)}: missing tag file (expected {len(ids)} ids)")
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            problems.append(f"{_rel(root, path)}: invalid JSON ({exc})")
+            continue
+        values = _tag_values(data)
+        for bid in sorted(ids):
+            ref = f"{modid}:{bid}"
+            if ref not in values:
+                problems.append(f"{_rel(root, path)}: missing '{ref}'")
+    return problems
+
+
+def expected_item_textures(specs, modid: str) -> dict:
+    """out_tex (no extension) -> owning block id for every required item sprite.
+
+    Covers explicit ``item_textures`` declarations and any ``("generated", ...)``
+    item model whose layer0 points into ``<modid>:item/``.
+    """
+    expected: dict = {}
+    for spec in specs:
+        name = spec["name"]
+        for out_tex, _src, _profile in spec.get("item_textures", []):
+            expected.setdefault(out_tex, name)
+        kind, ref = spec.get("item", (None, None))
+        if (kind == "generated" and isinstance(ref, str)
+                and ref.startswith(f"{modid}:item/")):
+            expected.setdefault(ref.split(":", 1)[1][len("item/"):], name)
+    return expected
+
+
+def item_texture_problems(root: Path, expected: dict, modid: str) -> list:
+    problems: list = []
+    for out_tex, owner in sorted(expected.items()):
+        rel = ASSETS_REL / modid / "textures" / "item" / f"{out_tex}.png"
+        if not (root / rel).is_file():
+            problems.append(
+                f"{_rel(root, root / rel)}: missing item texture for '{owner}'")
+    return problems
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="建材资源与注册双向校验")
     parser.add_argument("--root", default=str(Path(__file__).resolve().parents[1]),
@@ -190,10 +307,11 @@ def main() -> None:
     try:
         _selfcheck_patterns()
         expected = list(bd.all_building_block_ids())
+        building_specs = bd.all_building_specs()
         java_ids, scanned = java_literal_ids(root)
         tabs = tab_ids(root)
         langs = lang_keys(root, modid)
-    except (ParseError, json.JSONDecodeError) as exc:
+    except (ParseError, json.JSONDecodeError, bd.FamilyDataError) as exc:
         print("BUILDING ASSETS FAILED: 解析错误", file=sys.stderr)
         print(f"  - {exc}", file=sys.stderr)
         sys.exit(1)
@@ -227,6 +345,10 @@ def main() -> None:
             if key not in keys:
                 missing_lang.append(f"{fname}: {key}")
 
+    missing_tags = tag_problems(root, expected_tag_membership(building_specs), modid)
+    missing_item_tex = item_texture_problems(
+        root, expected_item_textures(building_specs, modid), modid)
+
     print(f"[build] table ids    : {len(expected)} (distinct {len(counts)})")
     print(f"[build] java ids     : {len(java_ids)} (from {', '.join(scanned)})")
     print(f"[build] tab ids      : {len(tabs)}")
@@ -243,6 +365,10 @@ def main() -> None:
         problems.append(("资源缺失", "missing resources", missing_resources))
     if missing_lang:
         problems.append(("lang 缺失", "missing lang keys", missing_lang))
+    if missing_tags:
+        problems.append(("标签缺失", "building id missing from vanilla tag", missing_tags))
+    if missing_item_tex:
+        problems.append(("物品贴图缺失", "missing textures/item png", missing_item_tex))
 
     if problems:
         print("BUILDING ASSETS FAILED", file=sys.stderr)
