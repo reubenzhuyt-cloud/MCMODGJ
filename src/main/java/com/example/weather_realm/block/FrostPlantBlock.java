@@ -2,8 +2,10 @@ package com.example.weather_realm.block;
 
 import com.example.weather_realm.ModTags;
 import net.minecraft.core.BlockPos;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.BushBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
@@ -32,6 +34,15 @@ public abstract class FrostPlantBlock extends BushBlock {
         return state.is(Blocks.SNOW)
                 && state.hasProperty(SnowLayerBlock.LAYERS)
                 && state.getValue(SnowLayerBlock.LAYERS) == 8;
+    }
+
+    /**
+     * Planting rule shared by the three tree saplings: unlike the other frost plants a sapling
+     * also accepts vanilla dirt-family blocks ({@code #minecraft:dirt}, which covers grass and
+     * moss blocks) and its own themed topsoil. Frost-plantable ground still works.
+     */
+    protected static boolean isSaplingPlantable(BlockState state, Block ground) {
+        return state.is(BlockTags.DIRT) || state.is(ground) || isFrostPlantable(state);
     }
 
     /** Whether a frost plant may be placed at {@code pos} (empty space with plantable ground below). */

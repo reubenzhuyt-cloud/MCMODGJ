@@ -357,7 +357,7 @@ def block_specs(theme):
     ))
     specs.append(dict(
         name=wn["leaves"], model="leaves", en=theme["wood_names_en"]["leaves"],
-        zh=theme["wood_names_zh"]["leaves"], loot=("leaves",),
+        zh=theme["wood_names_zh"]["leaves"], loot=("leaves", f"{theme['wood']}_sapling"),
         textures=[(f"{theme['wood']}_leaves", f"block/{wsrc}_leaves", theme["leaves_profile"])],
     ))
 
@@ -667,7 +667,7 @@ def write_block_loot(root: Path, spec) -> None:
     elif when[0] == "crystal_ore":
         table = bd.crystal_ore_loot(name, when[1])
     elif when[0] == "leaves":
-        table = bd.leaves_loot(name)
+        table = bd.leaves_loot(name, when[1])
     elif when[0] == "glass":
         table = bd.glass_loot(name)
     else:  # pragma: no cover
@@ -853,6 +853,43 @@ def write_recipes(root: Path, recipes) -> None:
         path.write_bytes(payload)
 
 
+# --- themed tree saplings ----------------------------------------------------
+# ``frost_sapling`` is hand-authored; this additively derives the two non-frost saplings from its
+# sprite so all three keep one silhouette. The recolor profiles are deterministic (no RNG), which
+# is what lets ``gen_block_assets.py`` be re-run byte-for-byte.
+SAPLING_SPECS = [
+    # 干枯米褐 / dry beige: desaturate + warm hue, keep the value roughly.
+    ("arid_sapling", dict(target_hue=0.13, sat_floor=0.20, sat_mul=0.55, val_mul=0.95,
+                          protect_sat=None, speck_hue_shift=0.0)),
+    # 焦黑棕 / charred brown: deep red-brown hue, pushed dark.
+    ("scorched_sapling", dict(target_hue=0.045, sat_floor=0.35, sat_mul=0.85, val_mul=0.55,
+                              protect_sat=None, speck_hue_shift=0.0)),
+]
+SAPLING_SOURCE = "frost_sapling"
+
+
+def write_sapling_assets(root: Path) -> int:
+    """Derive the two themed saplings from the frozen sprite (texture + models + self loot)."""
+    assets = root / "src/main/resources/assets" / MODID
+    data = root / "src/main/resources/data" / MODID
+    source = assets / "textures/block" / f"{SAPLING_SOURCE}.png"
+    if not source.is_file():
+        raise FileNotFoundError(f"sapling source texture missing: {source}")
+    source_img = Image.open(source).convert("RGBA")
+    for name, profile in SAPLING_SPECS:
+        recolor(source_img, profile, None, name).save(assets / "textures/block" / f"{name}.png")
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/cross", "render_type": "minecraft:cutout",
+            "textures": {"cross": f"{MODID}:block/{name}"}})
+        write_json(assets / "blockstates" / f"{name}.json",
+                   {"variants": {"": {"model": f"{MODID}:block/{name}"}}})
+        write_json(assets / "models/item" / f"{name}.json", {
+            "parent": "minecraft:item/generated",
+            "textures": {"layer0": f"{MODID}:block/{name}"}})
+        write_json(data / "loot_table/blocks" / f"{name}.json", bd.self_loot(name))
+    return len(SAPLING_SPECS)
+
+
 # --- entry point -------------------------------------------------------------
 def collect_building_specs():
     """Expand ``bd.BUILDING_FAMILIES`` into concrete block specs.
@@ -908,6 +945,8 @@ def run(root: Path) -> None:
     recipes = bd.building_recipes()
     write_recipes(root, recipes)
     print(f"[gen] wrote {len(recipes)} building recipes")
+    saplings = write_sapling_assets(root)
+    print(f"[gen] wrote {saplings} themed saplings")
     ZIP.close()
     print(f"[gen] wrote textures + resources for {total} blocks "
           f"({2 * total} block textures) under {root}")

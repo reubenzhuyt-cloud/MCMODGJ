@@ -124,7 +124,7 @@ public final class ModCreativeTabs {
             new TabCategory("plants", List.of(
                     "frost_flower", "frost_grass", "glacier_bloom", "frost_sprout",
                     "tall_frost_flower", "tall_frost_grass", "frost_sapling", "frost_leaves",
-                    "scorched_leaves", "arid_leaves",
+                    "scorched_leaves", "scorched_sapling", "arid_leaves", "arid_sapling",
                     "cinder_bloom", "flame_sprout", "fire_flower",
                     "dune_flower", "wind_sprout", "arid_bush")),
             new TabCategory("functional", List.of("weather_altar_core", "weather_pedestal")));

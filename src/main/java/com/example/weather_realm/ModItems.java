@@ -230,12 +230,14 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> SCORCHED_WOOD_ITEM = ITEMS.registerSimpleBlockItem("scorched_wood", ModBlocks.SCORCHED_WOOD);
     public static final DeferredItem<BlockItem> STRIPPED_SCORCHED_LOG_ITEM = ITEMS.registerSimpleBlockItem("stripped_scorched_log", ModBlocks.STRIPPED_SCORCHED_LOG);
     public static final DeferredItem<BlockItem> SCORCHED_LEAVES_ITEM = ITEMS.registerSimpleBlockItem("scorched_leaves", ModBlocks.SCORCHED_LEAVES);
+    public static final DeferredItem<BlockItem> SCORCHED_SAPLING_ITEM = ITEMS.registerSimpleBlockItem("scorched_sapling", ModBlocks.SCORCHED_SAPLING);
 
     // --- 风化木 / Arid wood (arid biome tree family) --------------------------------------------
     public static final DeferredItem<BlockItem> ARID_LOG_ITEM = ITEMS.registerSimpleBlockItem("arid_log", ModBlocks.ARID_LOG);
     public static final DeferredItem<BlockItem> ARID_WOOD_ITEM = ITEMS.registerSimpleBlockItem("arid_wood", ModBlocks.ARID_WOOD);
     public static final DeferredItem<BlockItem> STRIPPED_ARID_LOG_ITEM = ITEMS.registerSimpleBlockItem("stripped_arid_log", ModBlocks.STRIPPED_ARID_LOG);
     public static final DeferredItem<BlockItem> ARID_LEAVES_ITEM = ITEMS.registerSimpleBlockItem("arid_leaves", ModBlocks.ARID_LEAVES);
+    public static final DeferredItem<BlockItem> ARID_SAPLING_ITEM = ITEMS.registerSimpleBlockItem("arid_sapling", ModBlocks.ARID_SAPLING);
 
     // --- 植被 / Vegetation ----------------------------------------------------------------------
     public static final DeferredItem<BlockItem> CINDER_BLOOM_ITEM = ITEMS.registerSimpleBlockItem("cinder_bloom", ModBlocks.CINDER_BLOOM);

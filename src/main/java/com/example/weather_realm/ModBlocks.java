@@ -3,6 +3,7 @@ package com.example.weather_realm;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.example.weather_realm.block.AridSaplingBlock;
 import com.example.weather_realm.block.BiomePlantBlock;
 import com.example.weather_realm.block.FrostFlowerBlock;
 import com.example.weather_realm.block.FrostGrassBlock;
@@ -11,6 +12,7 @@ import com.example.weather_realm.block.FrostLogBlock;
 import com.example.weather_realm.block.FrostSaplingBlock;
 import com.example.weather_realm.block.FrostSproutBlock;
 import com.example.weather_realm.block.GlacierBloomBlock;
+import com.example.weather_realm.block.ScorchedSaplingBlock;
 import com.example.weather_realm.block.TallFrostFlowerBlock;
 import com.example.weather_realm.block.TallFrostGrassBlock;
 import com.example.weather_realm.block.WeatherAltarCoreBlock;
@@ -405,6 +407,16 @@ public final class ModBlocks {
                     .ignitedByLava()
                     .pushReaction(PushReaction.DESTROY));
 
+    // 焦木树苗 / Scorched Sapling
+    public static final DeferredBlock<ScorchedSaplingBlock> SCORCHED_SAPLING = BLOCKS.registerBlock("scorched_sapling", ScorchedSaplingBlock::new,
+            BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.PLANT)
+                    .noCollission()
+                    .instabreak()
+                    .sound(SoundType.GRASS)
+                    .offsetType(BlockBehaviour.OffsetType.XZ)
+                    .pushReaction(PushReaction.DESTROY));
+
     // --- 风化木 / Arid wood (arid biome tree family) --------------------------------------------
     public static final DeferredBlock<FrostLogBlock> ARID_LOG = BLOCKS.registerBlock("arid_log", FrostLogBlock::new, ModBlockProperties.aridWoodPillar());
     public static final DeferredBlock<FrostLogBlock> ARID_WOOD = BLOCKS.registerBlock("arid_wood", FrostLogBlock::new, ModBlockProperties.aridWoodPillar());
@@ -421,6 +433,16 @@ public final class ModBlocks {
                     .isSuffocating((state, level, pos) -> false)
                     .isViewBlocking((state, level, pos) -> false)
                     .ignitedByLava()
+                    .pushReaction(PushReaction.DESTROY));
+
+    // 风化树苗 / Arid Sapling
+    public static final DeferredBlock<AridSaplingBlock> ARID_SAPLING = BLOCKS.registerBlock("arid_sapling", AridSaplingBlock::new,
+            BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.PLANT)
+                    .noCollission()
+                    .instabreak()
+                    .sound(SoundType.GRASS)
+                    .offsetType(BlockBehaviour.OffsetType.XZ)
                     .pushReaction(PushReaction.DESTROY));
 
     // --- 植被 / Vegetation ----------------------------------------------------------------------

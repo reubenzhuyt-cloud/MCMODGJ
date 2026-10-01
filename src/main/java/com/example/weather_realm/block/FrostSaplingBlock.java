@@ -39,6 +39,11 @@ public class FrostSaplingBlock extends FrostPlantBlock implements BonemealableBl
     }
 
     @Override
+    protected boolean mayPlaceOn(BlockState state, BlockGetter level, BlockPos pos) {
+        return isSaplingPlantable(state, ModBlocks.FROST_MOSS.get());
+    }
+
+    @Override
     public boolean isValidBonemealTarget(LevelReader level, BlockPos pos, BlockState state) {
         return true;
     }
