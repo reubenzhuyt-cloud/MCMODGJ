@@ -275,9 +275,9 @@ Windows 一律用 `.\gradlew.bat` 前缀。
 3. GameTest 全绿(`.\gradlew.bat runGameTestServer`)。
 4. DataGen 产物(`src/generated/resources/`)**已提交**。
 5. 未把开发期专属配置带进产物;`neoforge.mods.toml` 的 `version`/`license`/`modId`/依赖区间正确。
-6. **四个 Python 静态校验脚本必须全部 `exit 0`**:`tools\verify_tab_coverage.py`、`tools\verify_building_assets.py`、`tools\verify_ore_textures.py`、`tools\verify_village_altar.py`。理由:本仓库**无测试基建**(`src/test/java` 不存在)、团队禁用 `runClient`/`runServer`/`runGameTestServer`,静态脚本是当前**主要的自动化门禁**;任一非零即视为门禁失败。
+6. **五个 Python 静态校验脚本必须全部 `exit 0`**:`tools\verify_tab_coverage.py`、`tools\verify_building_assets.py`、`tools\verify_ore_textures.py`、`tools\verify_village_altar.py`、`tools\verify_worldgen.py`。理由:本仓库**无测试基建**(`src/test/java` 不存在)、团队禁用 `runClient`/`runServer`/`runGameTestServer`,静态脚本是当前**主要的自动化门禁**;任一非零即视为门禁失败。
 
-> ⚠️ 本次新增条目(§8 的 `python tools\gen_block_assets.py` 行、§9 第 6 条)由 agent 于 2026-10-01 追加,待团队确认。§9 第 6 条于 2026-10-01 二次追加 `tools\verify_village_altar.py`(「三个」→「四个」),同属待团队确认。
+> ⚠️ 本次新增条目(§8 的 `python tools\gen_block_assets.py` 行、§9 第 6 条)由 agent 于 2026-10-01 追加,待团队确认。§9 第 6 条于 2026-10-01 二次追加 `tools\verify_village_altar.py`(「三个」→「四个」);于 2026-10-02 三次追加 `tools\verify_worldgen.py`(「四个」→「五个」,含冰面守卫/标签成员/引用完整性),同属待团队确认。
 
 - 可选:`spotlessApply` 格式化(团队自行决定是否引入)。
 - 注:单元测试(`src/test/java`,JUnit 5)**不加载** MC 引擎与注册表,只能测纯算法;任何依赖 `net.minecraft.*` 的代码只能用 GameTest。

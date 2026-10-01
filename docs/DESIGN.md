@@ -113,7 +113,7 @@
 | 地表 | 顶层雪 / 浮冰 / 冰 / 细雪 / 砂砾，基底 y ≥ 8 `permafrost` → y ≤ 0 `deep_permafrost`（中间为原版 deepslate 式逐块噪声过渡） | `world/ModSurfaceRules.java` |
 | 生物 | 冰原羊 / 冰原牛 / 冰原猪 / 冰原猫 | 同上 `spawners` |
 | 专属矿 | 冻土暴风雪结晶矿（浅/深）→ `blizzard_crystal` | `placed_feature/ore_permafrost_blizzard_crystal.json` |
-| 植被 | 坚冰木、冰晶花、冰雪草、冰川兰、霜草幼芽、高霜草/高霜冻花、晶冰斑块 | `placed_feature/{frost_tree,frost_flower,...}.json` |
+| 植被 | 坚冰木、冰晶花、冰雪草、冰川兰、霜草幼芽、高霜草/高霜冻花、晶冰斑块（霜系地被只长在 `frost_moss`/雪/细雪上，**不长在冰上**） | `placed_feature/{frost_tree,frost_flower,...}.json` |
 | 天气表现 | **永久暴风雪**（仅此群系），带 1.25 s 跨群系淡入淡出 | `client/ClientBlizzardEffects.java` |
 | 专属音乐 | 「水晶平原」`unyielding_icy_wind` | `sounds.json` + `sounds/music/unyielding_icy_wind.ogg` |
 
@@ -125,7 +125,7 @@
 | 气候 | `temperature=2.0`、`downfall=0`、无降水 | `worldgen/biome/blazing_plains.json` |
 | 地表 | y ≥ 8 `fire_stone` → y ≤ 0 `deep_fire_stone`（deepslate 式噪声过渡） | `world/ModSurfaceRules.java` |
 | 专属矿 | 火石烈火晶石矿 → `blaze_crystal` | `placed_feature/ore_fire_stone_blaze_crystal.json` |
-| 木族/植被 | 焦木 13 件套（原木/木/去皮原木/去皮木/木板/楼梯/台阶/栅栏/栅栏门/门/活板门/压力板/按钮，本次补齐）+ 灰烬兰、烈焰草幼芽、火晶花 | `placed_feature/{scorched_tree,cinder_bloom,flame_sprout,fire_flower}.json`、`recipe/scorched_*.json` |
+| 木族/植被 | 焦木 13 件套（原木/木/去皮原木/去皮木/木板/楼梯/台阶/栅栏/栅栏门/门/活板门/压力板/按钮，本次补齐）+ 灰烬兰、烈焰草幼芽、火晶花（地被密度已降为原 **1/4**，树不变） | `placed_feature/{scorched_tree,cinder_bloom,flame_sprout,fire_flower}.json`、`recipe/scorched_*.json` |
 | 缺失 | **无生物刷新**（`spawners` 为空）、**无热害/灼烧机制**（木族衍生件已于本次补齐） | 同上 JSON 与 `recipe/` 目录 |
 
 > 设计愿景：烈焰平原应是「反向失温」——高温灼烧、岩浆裂隙与耐火装备链。目前只完成了**地形与资源层**。
@@ -138,7 +138,7 @@
 | 气候 | `temperature=1.5`、`downfall=0`、无降水 | `worldgen/biome/arid_wasteland.json` |
 | 地表 | y ≥ 8 `weathered_sandstone` → y ≤ 0 `deep_weathered_sandstone`（deepslate 式噪声过渡） | `world/ModSurfaceRules.java` |
 | 专属矿 | 风化砂石风沙晶石矿 → `wind_crystal` | `placed_feature/ore_weathered_sandstone_wind_crystal.json` |
-| 木族/植被 | 风化木 13 件套（原木/木/去皮原木/去皮木/木板/楼梯/台阶/栅栏/栅栏门/门/活板门/压力板/按钮，本次补齐）+ 沙丘花、风生草、风沙灌木 | `placed_feature/{arid_tree,dune_flower,wind_sprout,arid_bush}.json`、`recipe/arid_*.json` |
+| 木族/植被 | 风化木 13 件套（原木/木/去皮原木/去皮木/木板/楼梯/台阶/栅栏/栅栏门/门/活板门/压力板/按钮，本次补齐）+ 沙丘花、风生草、风沙灌木（地被密度已降为原 **1/4**，树不变） | `placed_feature/{arid_tree,dune_flower,wind_sprout,arid_bush}.json`、`recipe/arid_*.json` |
 | 缺失 | **无生物刷新**、**无沙暴/风蚀机制**（木族衍生件已于本次补齐） | 同上 JSON 与 `recipe/` 目录 |
 
 ### 3.4 表层过渡方块 🟡
@@ -276,6 +276,9 @@
 - 燃焰：灰烬兰、烈焰草幼芽、火晶花、焦木树苗。
 - 风沙：沙丘花、风生草、风沙灌木、风化树苗。
 - 证据：`lang/zh_cn.json`、`placed_feature/` 下对应 JSON。
+- **霜系植被可种地面**：`frost_plantable_on` = `minecraft:snow_block` / `minecraft:powder_snow` / `weather_realm:frost_moss`；**冰（`ice` / `packed_ice` / `blue_ice`）已移除**——霜系地被不再生成在冰面，玩家也不能再手动种在冰上（与「冰不长草」一致）。门禁 `tools/verify_worldgen.py` 冰面守卫。
+- **地被密度**：风沙（`dune_flower` / `wind_sprout` / `arid_bush`）与燃焰（`cinder_bloom` / `flame_sprout` / `fire_flower`）两群系地被已降为原 **1/4**（`rarity_filter` 乘性抽稀，精确无取整误差）；树（`arid_tree` / `scorched_tree`）与霜系植被密度不变。
+- **生效范围**：worldgen 改动需**退出到主界面重进存档**，且只对**新区块**生效。
 
 ### 7.5 生物
 

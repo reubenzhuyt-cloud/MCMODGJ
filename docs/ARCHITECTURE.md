@@ -82,7 +82,7 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 | `WeatherPortalBlock.java` (241) | 传送门方块，`extends Block implements Portal`；空选框（`:65`）、不可冲毁（`:71`）、`entityInside`→`setAsInsidePortal`（`:82`）、`getPortalDestination`（`:90`）、安全落点扫描 `findSafeLandingY`（`:183`）、粒子（`:226`）。 |
 | `WeatherAltarCoreBlock.java` (36) | 祭坛核心 `BaseEntityBlock`（渲染形状 INVISIBLE，视觉由 BER 接管）。 |
 | `WeatherAltarCoreBlockEntity.java` (22) | 核心方块实体（无数据，仅用于挂 BER）。 |
-| `FrostPlantBlock.java` (52) | 冰系植物共享基类：默认仅可种在 `frost_plantable_on` 或满层雪上（`:22-25`）；另提供树苗专用 `isSaplingPlantable`（`:37-42`：额外接受 `#minecraft:dirt`（含草方块）与主题地面方块）。 |
+| `FrostPlantBlock.java` (52) | 冰系植物共享基类：默认仅可种在 `frost_plantable_on`（`minecraft:snow_block` / `minecraft:powder_snow` / `weather_realm:frost_moss`，**冰 `ice`/`packed_ice`/`blue_ice` 已移除**）或满层雪上（`:22-25`）；另提供树苗专用 `isSaplingPlantable`（`:37-42`：额外接受 `#minecraft:dirt`（含草方块）与主题地面方块）。 |
 | `BiomePlantBlock.java` (58) | 燃焰/风沙植物共享基类，用 `Ground` 枚举选择 `mayPlaceOn`（`:48-57`）；合并了原 `FirePlantBlock`/`AridPlantBlock`。 |
 | `FrostBonemeal.java` (67) | 骨粉扩散共享助手：`spreadArea`（`:27`）/`duplicateNearby`（`:45`）。 |
 | `FrostFlowerBlock.java` (62) | 冰晶花；骨粉复制到邻近雪块，否则掉落自身（`:55-60`）。 |
@@ -92,7 +92,7 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 | `TallFrostFlowerBlock.java` (51) | 两格高霜冻花；骨粉掉落自身。 |
 | `TallFrostGrassBlock.java` (30) | 两格高霜草。 |
 | `ThemeSaplingBlock.java` (110) | 树苗生长可参数化基类：注入原木/树叶/主题地面与高度区间 + `Canopy` 树冠策略；受世界高度与碰撞检查约束（`:76-100`）。 |
-| `FrostSaplingBlock.java` (121) | 坚冰木树苗；骨粉生成 6–8 格高锥形冷杉（`:61-88`）；可种在雪/冰、草方块与`frost_moss`上。 |
+| `FrostSaplingBlock.java` (121) | 坚冰木树苗；骨粉生成 6–8 格高锥形冷杉（`:61-88`）；可种在雪/细雪、草方块与`frost_moss`上（不再含冰）。 |
 | `AridSaplingBlock.java` (54) | 风化树苗；5–7 格细干 + 小而稀的树冠（`:26-34`）；可种在草方块与`dry_turf`上。 |
 | `ScorchedSaplingBlock.java` (61) | 焦木树苗；4–6 格树干（基部加宽）+ 宽而密的树冠（`:26-40`）；可种在草方块与`volcanic_ash`上。 |
 | `FrostLeavesBlock.java` (21) | 坚冰木树叶（原版落叶逻辑）。 |
@@ -328,6 +328,7 @@ entityInside (:82)  canUsePortal(false) → entity.setAsInsidePortal(this, pos) 
   - 浅/深层分界**不再是 y=0 硬切**，改为原版 deepslate 式噪声过渡：`SurfaceRules.verticalGradient("deepslate", absolute(0), absolute(8))`（`DEEP_GRADIENT`，`:77-78`），`SHALLOW_GRADIENT = not(DEEP_GRADIENT)`（`:81`）。即 **y ≤ 0 深层、y ≥ 8 浅层，中间为逐块噪声带**；刻意复用原版随机名 `"deepslate"` 以与 vanilla 边界逐块对齐。
   - 浅/深层岩分支**故意不做 `abovePreliminarySurface` 包裹**，实现整柱替换，从而让自定义 `ore_replaceables` 标签下的全套矿石生成。
   - 群系 `ResourceKey` 常量在 `:51-63`。
+  - **改动生效范围**：worldgen（群系 / 地物 / 标签）改后需**退出到主界面重进存档**，且只对**新区块**生效（`/reload` 不会重生成已存在区块）。
 
 ### 5.6 建筑方块资源生成管线（Python，本次新增）
 
@@ -428,6 +429,7 @@ lang 亦为 dict.update merge（`:663-667`），不覆盖手写键。
 | `python tools\verify_building_assets.py` | 建材双向校验（本次新增） | 数据表 ↔ Java ↔ 资源 ↔ lang/标签；exit 0 |
 | `python tools\verify_ore_textures.py` | 矿石贴图校验（既有） | 复合矿石背景与岩石逐像素一致；exit 0 |
 | `python tools\verify_village_altar.py` | 村庄祭坛注入链静态门禁（本次新增） | 5 种村庄覆盖、锚点 NBT、模板池、群系 BGM 登记；exit 0 |
+| `python tools\verify_worldgen.py` | worldgen 静态门禁（本次新增） | 冰面守卫（霜系植被不得以冰为底）、`frost_plantable_on` 成员存在性、群系→placed_feature→configured_feature 引用完整性；exit 0 |
 | `python tools\make_village_start_nbt.py` | 生成/检查各村庄 `start.nbt` 锚点（本次新增） | 从 plains 模板派生 desert/savanna/taiga；确定性 gzip |
 | `.\deploy.ps1` / `.\deploy.bat` | 一键构建 + 注入 PCL mods | 见下 |
 
