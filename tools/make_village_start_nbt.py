@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import io
+import os
 import struct
 import sys
 from pathlib import Path
@@ -211,7 +212,12 @@ def write_nbt_bytes(root_name: str, root_payload) -> bytes:
 
 
 def write_nbt_file(path: Path, root_name: str, root_payload) -> None:
-    Path(path).write_bytes(write_nbt_bytes(root_name, root_payload))
+    """Atomically write gzip NBT: write a temp sibling, then ``os.replace``."""
+    path = Path(path)
+    data = write_nbt_bytes(root_name, root_payload)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(data)
+    os.replace(tmp, path)
 
 
 # --- small accessors --------------------------------------------------------
@@ -288,10 +294,10 @@ def _describe_jigsaws(jigsaws: list[dict]) -> list[str]:
     return lines
 
 
-def derive_anchor(template_path: Path, village_type: str) -> dict:
-    """Return a copy of the template root with the reconnect pool rewritten."""
+def derive_anchor(template_path: Path, village_type: str):
+    """Return ``(root_name, root)`` with the reconnect pool rewritten."""
     target_pool = TOWN_CENTERS[village_type]
-    _root_name, _root_type, root = read_nbt_file(template_path)
+    root_name, _root_type, root = read_nbt_file(template_path)
     jigsaws = find_jigsaws(root)
     if len(jigsaws) != 2:
         raise NbtError(
@@ -313,18 +319,63 @@ def derive_anchor(template_path: Path, village_type: str) -> dict:
         )
     pool_tag = reconnect[0].get("pool")
     reconnect[0]["pool"] = (pool_tag[0], target_pool)
-    return root
+    return root_name, root
+
+
+def _jigsaw_signature(root_payload: dict) -> set:
+    """Set of ``(name, target)`` pairs so a round-trip keeps jigsaw wiring."""
+    return {
+        (_get_str_or_none(j, "name"), _get_str_or_none(j, "target"))
+        for j in find_jigsaws(root_payload)
+    }
+
+
+def _verify_roundtrip(out_path: Path, expected_root_name: str, expected_root: dict,
+                      template_root: dict) -> int:
+    """Re-read a generated anchor and assert it is semantically what we meant.
+
+    Returns the number of jigsaw ``(name, target)`` pairs checked.
+    Raises ``NbtError`` on any mismatch.
+    """
+    got_name, _got_type, got_root = read_nbt_file(out_path)
+    if got_name != expected_root_name:
+        raise NbtError(
+            f"{out_path}: root name {got_name!r} != expected {expected_root_name!r}"
+        )
+    # (1) parses (above) and (2) is tag-for-tag equal to the intended root --
+    # the intended root already differs from the template only by the one pool
+    # string, so this also proves no other tag changed.
+    if got_root != expected_root:
+        raise NbtError(
+            f"{out_path}: re-read root differs from the intended rewritten root"
+        )
+    # (3) jigsaw name/target wiring is preserved from the template.
+    got_sig = _jigsaw_signature(got_root)
+    tmpl_sig = _jigsaw_signature(template_root)
+    if got_sig != tmpl_sig:
+        raise NbtError(
+            f"{out_path}: jigsaw name/target signature {got_sig!r} != template {tmpl_sig!r}"
+        )
+    return len(got_sig)
 
 
 def cmd_generate() -> int:
     if not TEMPLATE_NBT.is_file():
         sys.exit(f"template anchor not found: {TEMPLATE_NBT}")
+    _tmpl_name, _tmpl_type, template_root = read_nbt_file(TEMPLATE_NBT)
+    total_jigsaws_checked = 0
     for village_type in GENERATE_TYPES:
-        root = derive_anchor(TEMPLATE_NBT, village_type)
+        root_name, expected_root = derive_anchor(TEMPLATE_NBT, village_type)
         out = STRUCTURE_DIR / village_type / "start.nbt"
         out.parent.mkdir(parents=True, exist_ok=True)
-        write_nbt_file(out, "", root)
-        print(f"[gen] wrote {out.relative_to(REPO)}")
+        write_nbt_file(out, root_name, expected_root)
+        checked = _verify_roundtrip(out, root_name, expected_root, template_root)
+        total_jigsaws_checked += checked
+        print(
+            f"[gen] wrote {out.relative_to(REPO)} "
+            f"(root_name={root_name!r}, roundtrip OK, jigsaw name/target pairs={checked})"
+        )
+    print(f"[gen] round-trip self-check passed for {total_jigsaws_checked} jigsaw pairs")
     return 0
 
 
