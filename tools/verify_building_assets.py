@@ -1149,6 +1149,99 @@ def sapling_model_problems(root: Path, modid: str):
     return problems, len(blockstates)
 
 
+# --- solid-cube transparency guard ---------------------------------------------------------
+# A full opaque cube (``cube_all`` / ``pillar``) occludes its neighbours, so the engine culls
+# the neighbour faces touching it. If such a block's texture has alpha=0 pixels and is drawn
+# cutout, you see straight through the hole to the culled neighbour (the void) -- e.g. the
+# arid wood holes punched in the previous round. Solid cubes therefore may NOT contain alpha=0
+# pixels, and must NOT declare cutout. Only genuinely non-occluding shapes may be transparent,
+# and those must carry an explicit cutout.
+_SOLID_CUBE_SHAPES = frozenset({"cube_all", "pillar"})
+# Inherently transparent shapes whose vanilla-template models carry no render_type and rely on
+# the engine's default render layer (glass panes, chains, lanterns, glass blocks, doors with a
+# glass window). They are NOT opaque cubes, so they cannot cause the void bug; exempt from the
+# "transparency => explicit cutout" rule so pre-existing hand-authored/vanilla-template models
+# keep working unchanged. NOTE: this is a deliberate, documented exemption -- everything else
+# (cross / leaves / cluster / spike and all derived solid shapes) IS enforced.
+_CUTOUT_EXEMPT_SHAPES = frozenset({"door", "pane", "chain", "lantern", "glass_block"})
+
+
+def _all_asset_specs() -> list:
+    """Every block spec the generator emits: building families + covers + per-theme blocks."""
+    specs = list(bd.all_building_specs())
+    specs += list(gba.cover_specs())
+    for theme in bd.THEMES:
+        specs += list(gba.block_specs(theme))
+    return specs
+
+
+def alpha_guard_problems(root: Path, modid: str):
+    """Solid cubes opaque + transparency paired with cutout. Returns ``(problems, summary)``."""
+    if Image is None:
+        raise ParseError("实心立方 alpha 门禁需要 Pillow（pip install Pillow）")
+    assets = root / ASSETS_REL / modid
+    model_dir = assets / "models/block"
+    tex_dir = assets / "textures"
+    cache: dict = {}
+
+    def alpha0(texid: str):
+        if texid in cache:
+            return cache[texid]
+        path = tex_dir / f"{texid.split(':', 1)[1]}.png"
+        count = None
+        if path.is_file():
+            im = Image.open(path).convert("RGBA")
+            px = im.load()
+            count = sum(1 for y in range(im.height) for x in range(im.width) if px[x, y][3] == 0)
+        cache[texid] = count
+        return count
+
+    problems: list = []
+    solid_checked = 0
+    transparent_checked = 0
+    for spec in _all_asset_specs():
+        name = spec["name"]
+        shape = real_shape(spec)
+        suffixes = _BLOCK_MODEL_SUFFIXES.get(shape)
+        if suffixes is None:  # unknown shapes are already a hard failure via check_known_shapes
+            continue
+        is_solid = shape in _SOLID_CUBE_SHAPES
+        for suffix in suffixes:
+            model_path = model_dir / f"{name}{suffix}.json"
+            if not model_path.is_file():
+                continue  # missing models are reported by block_model_problems
+            data = json.loads(model_path.read_text(encoding="utf-8"))
+            render_type = data.get("render_type")
+            tex_ids = sorted({v for v in data.get("textures", {}).values()
+                              if isinstance(v, str) and v.startswith(f"{modid}:block/")})
+            counts = {t: alpha0(t) for t in tex_ids}
+            transparent = any(c for c in counts.values() if c)
+            if is_solid:
+                solid_checked += 1
+                for tex, count in counts.items():
+                    if count:
+                        problems.append(
+                            f"{_rel(root, model_path)}: 实心不透明立方体引用了含 {count} 个 "
+                            f"alpha=0 像素的 {tex}.png -> 邻面被剔除会透视；请去掉洞")
+                if render_type is not None:
+                    problems.append(
+                        f"{_rel(root, model_path)}: 实心不透明立方体声明了 "
+                        f"render_type={render_type!r}（不透明贴图无需 cutout）；请移除")
+            else:
+                transparent_checked += 1
+                if shape in _CUTOUT_EXEMPT_SHAPES:
+                    continue
+                if transparent and render_type != "minecraft:cutout":
+                    problems.append(
+                        f"{_rel(root, model_path)}: 引用含 alpha=0 的贴图 {tex_ids} "
+                        f"但 render_type != minecraft:cutout")
+    if solid_checked == 0:
+        raise ParseError("实心立方 alpha 门禁解析到 0 个模型（数据表结构变了？）")
+    summary = {"solid_checked": solid_checked, "transparent_checked": transparent_checked,
+               "over": len(problems)}
+    return problems, summary
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="建材资源与注册双向校验")
     parser.add_argument("--root", default=str(Path(__file__).resolve().parents[1]),
@@ -1170,6 +1263,7 @@ def main() -> None:
         blockstate_prop_diffs = blockstate_property_problems(root, building_specs, modid)
         function_cond_diffs, loot_tables_scanned = function_condition_problems(root, modid)
         sapling_model_diffs, saplings_checked = sapling_model_problems(root, modid)
+        alpha_diffs, alpha_summary = alpha_guard_problems(root, modid)
         with zipfile.ZipFile(gba.find_client_jar(root)) as zf:
             vanilla_leaf_ref = _vanilla_leaf_reference(zf)
         leaves_diffs, leaves_checked = leaves_structure_problems(root, modid, vanilla_leaf_ref)
@@ -1236,6 +1330,10 @@ def main() -> None:
           f"{len(function_cond_diffs)} illegal")
     print(f"[build] sapling model : cross + cutout "
           f"({saplings_checked} checked, {len(sapling_model_diffs)} over)")
+    print(f"[build] alpha guard  : solid-cube opaque + transparency cutout "
+          f"({alpha_summary['solid_checked']} solid checked, "
+          f"{alpha_summary['transparent_checked']} transparent checked, "
+          f"{alpha_summary['over']} over)")
 
     problems = []
     if missing_java:
@@ -1273,6 +1371,9 @@ def main() -> None:
     if sapling_model_diffs:
         problems.append(("树苗模型错误", "sapling block model not cross+cutout",
                          sapling_model_diffs))
+    if alpha_diffs:
+        problems.append(("实心立方透明像素/多余 cutout", "solid cube alpha or stray cutout",
+                         alpha_diffs))
 
     if problems:
         print("BUILDING ASSETS FAILED", file=sys.stderr)
