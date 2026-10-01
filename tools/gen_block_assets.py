@@ -491,6 +491,8 @@ def write_block_loot(root: Path, spec) -> None:
         table = bd.crystal_ore_loot(name, when[1])
     elif when[0] == "leaves":
         table = bd.leaves_loot(name)
+    elif when[0] == "glass":
+        table = bd.glass_loot(name)
     else:  # pragma: no cover
         raise ValueError(when)
     write_json(data / "loot_table/blocks" / f"{name}.json", table)
@@ -620,6 +622,12 @@ def collect_building_specs():
             specs += bd.stone_specs(fam)
         elif kind == "wood":
             specs += bd.wood_specs(fam)
+        elif kind == "lantern":
+            pass  # expanded once below
+        elif kind == "decoration":
+            pass  # expanded once below
+    specs += bd.lantern_specs()
+    specs += bd.decoration_specs()
     return specs
 
 

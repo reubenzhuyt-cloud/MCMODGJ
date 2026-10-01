@@ -386,8 +386,25 @@ WOOD_BASES = [
          log="arid_log", stripped_log="stripped_arid_log"),
 ]
 
-# Phase B 为空；Phase C 用真实族填充。
-BUILDING_FAMILIES = []
+_LANTERN_BASES = [
+    ("frost", "坚冰", "Frost", "block/lantern", FROST_STONE_PROFILE),
+    ("blaze", "燃焰", "Blaze", "block/lantern", THEMES[0]["stone_profile"]),
+    ("wind", "风沙", "Wind", "block/lantern", THEMES[1]["stone_profile"]),
+]
+_DECORATION_BASES = [
+    ("frost", "坚冰", "Frost", FROST_STONE_PROFILE),
+    ("blaze", "燃焰", "Blaze", THEMES[0]["stone_profile"]),
+    ("wind", "风沙", "Wind", THEMES[1]["stone_profile"]),
+]
+
+# Phase B 为空；Phase C 用真实族填充。顺序：石（frost→fire→wind）→
+# 木（scorched→arid）→ 灯笼（frost→blaze→wind）→ 装饰（frost→blaze→wind）。
+BUILDING_FAMILIES = (
+    [dict(kind="stone", **f) for f in STONE_BASES]
+    + [dict(kind="wood", **f) for f in WOOD_BASES]
+    + [dict(kind="lantern", name=f"{p}_lantern") for p, *_ in _LANTERN_BASES]
+    + [dict(kind="decoration", prefix=p) for p, *_ in _DECORATION_BASES]
+)
 
 
 class FamilyDataError(ValueError):
@@ -563,12 +580,72 @@ def wood_specs(family):
     return specs
 
 
-def all_building_specs():
-    """Expanded specs of every family that produces block specs (stone/wood).
+def lantern_specs():
+    specs = []
+    for prefix, zh, en, src, profile in _LANTERN_BASES:
+        name = f"{prefix}_lantern"
+        specs.append(dict(name=name, model="lantern", en=f"{en} Lantern", zh=f"{zh}灯笼",
+                          loot=("self",), tool="pickaxe", needs=None, tags=[],
+                          textures=[(name, src, profile)], tex={"lantern": name},
+                          item=("generated", f"{MODID}:item/{name}"),
+                          item_textures=[(name, "item/lantern", profile)]))
+    return specs
 
-    ``lantern``/``decoration`` families are registered as bare ids elsewhere and
-    carry no per-shape spec, so they contribute no tag/tex expectations.
-    """
+
+def decoration_specs():
+    specs = []
+    for prefix, zh, en, profile in _DECORATION_BASES:
+        glass = f"{prefix}_glass"
+        pane = f"{prefix}_glass_pane"
+        grate = f"{prefix}_grate"
+        chain = f"{prefix}_chain"
+        specs.append(dict(name=glass, model="glass_block", en=f"{en} Glass", zh=f"{zh}玻璃",
+                          loot=("glass",), tool=None, needs=None, tags=[],
+                          textures=[(glass, "block/glass", profile)], tex={"all": glass},
+                          item=("parent", glass)))
+        specs.append(dict(name=pane, model="pane", en=f"{en} Glass Pane", zh=f"{zh}玻璃板",
+                          loot=("glass",), tool=None, needs=None, tags=[],
+                          textures=[(pane, "block/glass", profile),
+                                    (f"{pane}_top", "block/glass_pane_top", profile)],
+                          tex={"pane": pane, "edge": f"{pane}_top"},
+                          item=("generated", f"{MODID}:block/{pane}")))
+        specs.append(dict(name=grate, model="pane", en=f"{en} Grate", zh=f"{zh}格栅",
+                          loot=("self",), tool="pickaxe", needs=None, tags=[],
+                          textures=[(grate, "block/iron_bars", profile)],
+                          tex={"pane": grate, "edge": grate},
+                          item=("generated", f"{MODID}:block/{grate}")))
+        specs.append(dict(name=chain, model="chain", en=f"{en} Chain", zh=f"{zh}锁链",
+                          loot=("self",), tool="pickaxe", needs=None, tags=[],
+                          textures=[(chain, "block/chain", profile)], tex={"all": chain},
+                          item=("generated", f"{MODID}:item/{chain}"),
+                          item_textures=[(chain, "item/chain", profile)]))
+    return specs
+
+
+def glass_loot(block):
+    """Vanilla glass semantics: only silk touch drops the block itself."""
+    return {
+        "type": "minecraft:block",
+        "pools": [{
+            "bonus_rolls": 0.0,
+            "rolls": 1.0,
+            "entries": [{
+                "type": "minecraft:item",
+                "name": f"{MODID}:{block}",
+                "conditions": [
+                    {"condition": "minecraft:match_tool",
+                     "predicate": {"predicates": {"minecraft:enchantments": [
+                         {"enchantments": "minecraft:silk_touch", "levels": {"min": 1}}]}}},
+                    {"condition": "minecraft:survives_explosion"},
+                ],
+            }],
+        }],
+        "random_sequence": f"{MODID}:blocks/{block}",
+    }
+
+
+def all_building_specs():
+    """Expanded specs of every building family (stone/wood/lantern/decoration)."""
     specs = []
     for fam in BUILDING_FAMILIES:
         kind = family_kind(fam)
@@ -576,6 +653,12 @@ def all_building_specs():
             specs += stone_specs(fam)
         elif kind == "wood":
             specs += wood_specs(fam)
+        elif kind == "lantern":
+            pass  # expanded once via lantern_specs(), not per family
+        elif kind == "decoration":
+            pass  # expanded once via decoration_specs(), not per family
+    specs += lantern_specs()
+    specs += decoration_specs()
     return specs
 
 
