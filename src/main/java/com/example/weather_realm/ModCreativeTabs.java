@@ -82,7 +82,11 @@ public final class ModCreativeTabs {
                     "frost_glass", "frost_glass_pane", "frost_grate", "frost_chain",
                     "blaze_glass", "blaze_glass_pane", "blaze_grate", "blaze_chain",
                     "wind_glass", "wind_glass_pane", "wind_grate", "wind_chain")),
-            new TabCategory("decoration", List.of("frost_wool")),
+            new TabCategory("decoration", List.of(
+                    "frost_wool",
+                    "frost_crystal_cluster", "frost_snow_layer", "frost_spike",
+                    "blaze_crystal_cluster", "blaze_ash_layer", "blaze_spike",
+                    "wind_crystal_cluster", "wind_sand_layer", "wind_spike")),
             new TabCategory("ores", List.of(
                     "permafrost_iron_ore", "deep_permafrost_iron_ore",
                     "permafrost_coal_ore", "deep_permafrost_coal_ore",
