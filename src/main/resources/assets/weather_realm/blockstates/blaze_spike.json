@@ -1,0 +1,60 @@
+{
+  "variants": {
+    "thickness=tip,vertical_direction=up,waterlogged=false": {
+      "model": "weather_realm:block/blaze_spike_tip"
+    },
+    "thickness=tip,vertical_direction=up,waterlogged=true": {
+      "model": "weather_realm:block/blaze_spike_tip"
+    },
+    "thickness=tip,vertical_direction=down,waterlogged=false": {
+      "model": "weather_realm:block/blaze_spike_tip",
+      "x": 180
+    },
+    "thickness=tip,vertical_direction=down,waterlogged=true": {
+      "model": "weather_realm:block/blaze_spike_tip",
+      "x": 180
+    },
+    "thickness=frustum,vertical_direction=up,waterlogged=false": {
+      "model": "weather_realm:block/blaze_spike_frustum"
+    },
+    "thickness=frustum,vertical_direction=up,waterlogged=true": {
+      "model": "weather_realm:block/blaze_spike_frustum"
+    },
+    "thickness=frustum,vertical_direction=down,waterlogged=false": {
+      "model": "weather_realm:block/blaze_spike_frustum",
+      "x": 180
+    },
+    "thickness=frustum,vertical_direction=down,waterlogged=true": {
+      "model": "weather_realm:block/blaze_spike_frustum",
+      "x": 180
+    },
+    "thickness=middle,vertical_direction=up,waterlogged=false": {
+      "model": "weather_realm:block/blaze_spike_middle"
+    },
+    "thickness=middle,vertical_direction=up,waterlogged=true": {
+      "model": "weather_realm:block/blaze_spike_middle"
+    },
+    "thickness=middle,vertical_direction=down,waterlogged=false": {
+      "model": "weather_realm:block/blaze_spike_middle",
+      "x": 180
+    },
+    "thickness=middle,vertical_direction=down,waterlogged=true": {
+      "model": "weather_realm:block/blaze_spike_middle",
+      "x": 180
+    },
+    "thickness=base,vertical_direction=up,waterlogged=false": {
+      "model": "weather_realm:block/blaze_spike_base"
+    },
+    "thickness=base,vertical_direction=up,waterlogged=true": {
+      "model": "weather_realm:block/blaze_spike_base"
+    },
+    "thickness=base,vertical_direction=down,waterlogged=false": {
+      "model": "weather_realm:block/blaze_spike_base",
+      "x": 180
+    },
+    "thickness=base,vertical_direction=down,waterlogged=true": {
+      "model": "weather_realm:block/blaze_spike_base",
+      "x": 180
+    }
+  }
+}

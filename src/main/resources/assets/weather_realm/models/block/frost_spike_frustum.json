@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/pointed_dripstone_up_frustum",
+  "textures": {
+    "cross": "weather_realm:block/frost_spike_frustum"
+  }
+}

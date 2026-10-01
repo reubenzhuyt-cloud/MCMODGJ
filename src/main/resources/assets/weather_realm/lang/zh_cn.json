@@ -260,5 +260,14 @@
   "block.weather_realm.wind_glass": "风沙玻璃",
   "block.weather_realm.wind_glass_pane": "风沙玻璃板",
   "block.weather_realm.wind_grate": "风沙格栅",
-  "block.weather_realm.wind_chain": "风沙锁链"
+  "block.weather_realm.wind_chain": "风沙锁链",
+  "block.weather_realm.frost_crystal_cluster": "坚冰晶簇",
+  "block.weather_realm.blaze_crystal_cluster": "燃焰晶簇",
+  "block.weather_realm.wind_crystal_cluster": "风沙晶簇",
+  "block.weather_realm.frost_snow_layer": "坚冰雪层",
+  "block.weather_realm.blaze_ash_layer": "燃焰灰烬层",
+  "block.weather_realm.wind_sand_layer": "风沙沙层",
+  "block.weather_realm.frost_spike": "坚冰尖锥",
+  "block.weather_realm.blaze_spike": "燃焰尖锥",
+  "block.weather_realm.wind_spike": "风沙尖锥"
 }

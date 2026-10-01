@@ -3,6 +3,9 @@
   "values": [
     "weather_realm:frost_moss",
     "weather_realm:dry_turf",
-    "weather_realm:volcanic_ash"
+    "weather_realm:volcanic_ash",
+    "weather_realm:frost_snow_layer",
+    "weather_realm:blaze_ash_layer",
+    "weather_realm:wind_sand_layer"
   ]
 }

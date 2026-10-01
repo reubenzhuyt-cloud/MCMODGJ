@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/snow_height2",
+  "textures": {
+    "texture": "weather_realm:block/wind_sand_layer",
+    "particle": "weather_realm:block/wind_sand_layer"
+  }
+}

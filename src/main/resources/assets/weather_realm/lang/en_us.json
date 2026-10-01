@@ -260,5 +260,14 @@
   "block.weather_realm.wind_glass": "Wind Glass",
   "block.weather_realm.wind_glass_pane": "Wind Glass Pane",
   "block.weather_realm.wind_grate": "Wind Grate",
-  "block.weather_realm.wind_chain": "Wind Chain"
+  "block.weather_realm.wind_chain": "Wind Chain",
+  "block.weather_realm.frost_crystal_cluster": "Frost Crystal Cluster",
+  "block.weather_realm.blaze_crystal_cluster": "Blaze Crystal Cluster",
+  "block.weather_realm.wind_crystal_cluster": "Wind Crystal Cluster",
+  "block.weather_realm.frost_snow_layer": "Frost Snow Layer",
+  "block.weather_realm.blaze_ash_layer": "Volcanic Ash Layer",
+  "block.weather_realm.wind_sand_layer": "Wind Sand Layer",
+  "block.weather_realm.frost_spike": "Frost Spike",
+  "block.weather_realm.blaze_spike": "Blaze Spike",
+  "block.weather_realm.wind_spike": "Wind Spike"
 }

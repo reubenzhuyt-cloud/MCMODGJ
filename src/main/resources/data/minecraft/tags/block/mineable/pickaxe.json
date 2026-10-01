@@ -132,6 +132,12 @@
     "weather_realm:blaze_grate",
     "weather_realm:blaze_chain",
     "weather_realm:wind_grate",
-    "weather_realm:wind_chain"
+    "weather_realm:wind_chain",
+    "weather_realm:frost_crystal_cluster",
+    "weather_realm:blaze_crystal_cluster",
+    "weather_realm:wind_crystal_cluster",
+    "weather_realm:frost_spike",
+    "weather_realm:blaze_spike",
+    "weather_realm:wind_spike"
   ]
 }

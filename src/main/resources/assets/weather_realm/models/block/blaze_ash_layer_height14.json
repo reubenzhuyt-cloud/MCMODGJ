@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/snow_height14",
+  "textures": {
+    "texture": "weather_realm:block/blaze_ash_layer",
+    "particle": "weather_realm:block/blaze_ash_layer"
+  }
+}
