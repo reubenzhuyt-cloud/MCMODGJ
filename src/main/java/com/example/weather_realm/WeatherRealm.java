@@ -23,6 +23,7 @@ public class WeatherRealm {
     public WeatherRealm(IEventBus modEventBus, ModContainer modContainer) {
         // Register every deferred register on the mod event bus, in the exact order the monolith used.
         ModBlocks.register(modEventBus);          // BLOCKS
+        ModBuildingBlocks.register(modEventBus);  // BUILDING BLOCKS (must init before ModItems)
         ModItems.register(modEventBus);           // ITEMS
         ModCreativeTabs.register(modEventBus);    // CREATIVE_MODE_TABS
         ModParticles.register(modEventBus);       // PARTICLE_TYPES
