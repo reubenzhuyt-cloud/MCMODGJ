@@ -82,7 +82,7 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 | `WeatherPortalBlock.java` (241) | 传送门方块，`extends Block implements Portal`；空选框（`:65`）、不可冲毁（`:71`）、`entityInside`→`setAsInsidePortal`（`:82`）、`getPortalDestination`（`:90`）、安全落点扫描 `findSafeLandingY`（`:183`）、粒子（`:226`）。 |
 | `WeatherAltarCoreBlock.java` (36) | 祭坛核心 `BaseEntityBlock`（渲染形状 INVISIBLE，视觉由 BER 接管）。 |
 | `WeatherAltarCoreBlockEntity.java` (22) | 核心方块实体（无数据，仅用于挂 BER）。 |
-| `FrostPlantBlock.java` (44) | 冰系植物共享基类：仅可种在 `frost_plantable_on` 或满层雪上（`:28-43`）。 |
+| `FrostPlantBlock.java` (52) | 冰系植物共享基类：默认仅可种在 `frost_plantable_on` 或满层雪上（`:22-25`）；另提供树苗专用 `isSaplingPlantable`（`:37-42`：额外接受 `#minecraft:dirt`（含草方块）与主题地面方块）。 |
 | `BiomePlantBlock.java` (58) | 燃焰/风沙植物共享基类，用 `Ground` 枚举选择 `mayPlaceOn`（`:48-57`）；合并了原 `FirePlantBlock`/`AridPlantBlock`。 |
 | `FrostBonemeal.java` (67) | 骨粉扩散共享助手：`spreadArea`（`:27`）/`duplicateNearby`（`:45`）。 |
 | `FrostFlowerBlock.java` (62) | 冰晶花；骨粉复制到邻近雪块，否则掉落自身（`:55-60`）。 |
@@ -91,7 +91,10 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 | `GlacierBloomBlock.java` (37) | 冰川兰；可种在草/土/冻土与 frost-plantable。 |
 | `TallFrostFlowerBlock.java` (51) | 两格高霜冻花；骨粉掉落自身。 |
 | `TallFrostGrassBlock.java` (30) | 两格高霜草。 |
-| `FrostSaplingBlock.java` (116) | 坚冰木树苗；骨粉生成 6–8 格高锥形冷杉（`:56-83`）。 |
+| `ThemeSaplingBlock.java` (110) | 树苗生长可参数化基类：注入原木/树叶/主题地面与高度区间 + `Canopy` 树冠策略；受世界高度与碰撞检查约束（`:76-100`）。 |
+| `FrostSaplingBlock.java` (121) | 坚冰木树苗；骨粉生成 6–8 格高锥形冷杉（`:61-88`）；可种在雪/冰、草方块与`frost_moss`上。 |
+| `AridSaplingBlock.java` (54) | 风化树苗；5–7 格细干 + 小而稀的树冠（`:26-34`）；可种在草方块与`dry_turf`上。 |
+| `ScorchedSaplingBlock.java` (61) | 焦木树苗；4–6 格树干（基部加宽）+ 宽而密的树冠（`:26-40`）；可种在草方块与`volcanic_ash`上。 |
 | `FrostLeavesBlock.java` (21) | 坚冰木树叶（原版落叶逻辑）。 |
 | `FrostLogBlock.java` (21) | 坚冰木/焦木/风化木共用轴向柱方块。 |
 | `WeatherSpikeBlock.java` (137) | **天象尖锥**（本次新增自定义类）：`extends Block implements SimpleWaterloggedBlock`；状态 `thickness`（TIP/FRUSTUM/MIDDLE/BASE，枚举 `:56`）× `vertical_direction` × `waterlogged` = 16 组合；逐段收窄碰撞箱 `SHAPES`（`:46-51`）、`getStateForPlacement`（`:95`）、`canSurvive`（`:105`）、支撑消失时回落空气的 `updateShape`（`:112-121`）。生态小物中的晶簇/叠层则直接复用原版 `AmethystClusterBlock`/`SnowLayerBlock`，无自定义类。 |
