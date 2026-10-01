@@ -38,6 +38,7 @@ import math
 import os
 import re
 import sys
+import zipfile
 from collections import Counter
 from pathlib import Path
 
@@ -53,6 +54,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import biome_data as bd  # noqa: E402
+import gen_block_assets as gba  # noqa: E402
 
 # --- 路径约定（相对仓库根；不硬编码绝对路径）----------------------------------------------
 JAVA_REL = Path("src/main/java/com/example/weather_realm")
@@ -925,6 +927,228 @@ def item_texture_problems(root: Path, expected: dict, modid: str) -> list:
     return problems
 
 
+# --- leaf loot + sapling model assertions -------------------------------------------------
+# A `table_bonus` / `random_chance` condition attached to a *function* is inert: the function
+# still runs unconditionally, which is exactly the old "leaves always drop a stick/sapling" bug.
+# Those conditions only do anything on an *entry*, so any occurrence under functions[*].conditions
+# means the loot table is broken even though it still parses.
+INERT_FUNCTION_CONDITIONS = ("minecraft:table_bonus", "minecraft:random_chance")
+FORTUNE_TABLE_BONUS = "minecraft:table_bonus"
+
+
+def _iter_loot_entries(node):
+    """Yield every loot entry dict (a dict carrying a string ``name``)."""
+    if isinstance(node, dict):
+        if isinstance(node.get("name"), str):
+            yield node
+        for value in node.values():
+            yield from _iter_loot_entries(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _iter_loot_entries(value)
+
+
+def _scan_function_conditions(node, path, out) -> None:
+    if isinstance(node, dict):
+        funcs = node.get("functions")
+        if isinstance(funcs, list):
+            for fi, func in enumerate(funcs):
+                if not isinstance(func, dict):
+                    continue
+                for ci, cond in enumerate(func.get("conditions") or []):
+                    if isinstance(cond, dict) and cond.get("condition") in INERT_FUNCTION_CONDITIONS:
+                        out.append(f"{path}/functions[{fi}]/conditions[{ci}]"
+                                   f" = {cond.get('condition')}")
+        for key, value in node.items():
+            _scan_function_conditions(value, f"{path}/{key}", out)
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            _scan_function_conditions(value, f"{path}[{index}]", out)
+
+
+def function_condition_problems(root: Path, modid: str):
+    """Guard every loot table: no function may carry an inert table_bonus/random_chance condition."""
+    loot_dir = root / DATA_REL / modid / "loot_table" / "blocks"
+    files = sorted(loot_dir.glob("*.json"))
+    if not files:
+        raise ParseError(f"未找到任何掉落表: {loot_dir}/*.json")
+    problems: list = []
+    for path in files:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        hits: list = []
+        _scan_function_conditions(data, "", hits)
+        for hit in hits:
+            problems.append(f"{_rel(root, path)}: {hit.lstrip('/')}")
+    return problems, len(files)
+
+
+def _is_shears_silk_anyof(cond) -> bool:
+    if not isinstance(cond, dict) or cond.get("condition") != "minecraft:any_of":
+        return False
+    has_shears = has_silk = False
+    for term in cond.get("terms", []) or []:
+        if not isinstance(term, dict):
+            continue
+        pred = term.get("predicate", {}) or {}
+        if pred.get("items") == "minecraft:shears":
+            has_shears = True
+        enchants = (pred.get("predicates") or {}).get("minecraft:enchantments") or []
+        for ench in enchants:
+            if isinstance(ench, dict) and ench.get("enchantments") == "minecraft:silk_touch":
+                has_silk = True
+    return has_shears and has_silk
+
+
+def _entry_table_bonus(entry):
+    """Return the entry-level fortune table_bonus chances, or None."""
+    for cond in entry.get("conditions", []) or []:
+        if (isinstance(cond, dict) and cond.get("condition") == FORTUNE_TABLE_BONUS
+                and cond.get("enchantment") == "minecraft:fortune"):
+            return cond.get("chances")
+    return None
+
+
+def _is_degenerate_chances(chances) -> bool:
+    """A length-1 or all-1.0 chance array is the 'guaranteed drop' smell."""
+    return bool(
+        isinstance(chances, list) and chances
+        and (len(chances) == 1
+             or all(isinstance(c, (int, float)) and abs(c - 1.0) < 1e-9 for c in chances)))
+
+
+def _has_set_count_uniform_1_2(functions) -> bool:
+    for func in functions or []:
+        if not isinstance(func, dict) or func.get("function") != "minecraft:set_count":
+            continue
+        count = func.get("count")
+        if (isinstance(count, dict) and count.get("type") == "minecraft:uniform"
+                and float(count.get("min", -1)) == 1.0 and float(count.get("max", -1)) == 2.0):
+            return True
+    return False
+
+
+def _vanilla_leaf_reference(zf):
+    """Read the authoritative sapling / stick fortune chances from the client jar's oak leaves."""
+    path = "data/minecraft/loot_table/blocks/oak_leaves.json"
+    try:
+        data = json.loads(zf.read(path).decode("utf-8"))
+    except KeyError as exc:
+        raise ParseError(f"client jar 缺少 {path}（原版树叶掉落结构不可得）") from exc
+    ref = {"sapling_chances": None, "stick_chances": None}
+    for entry in _iter_loot_entries(data):
+        name = entry["name"]
+        for cond in entry.get("conditions", []) or []:
+            if not (isinstance(cond, dict) and cond.get("condition") == FORTUNE_TABLE_BONUS):
+                continue
+            if name == "minecraft:stick":
+                ref["stick_chances"] = cond.get("chances")
+            elif name.endswith("_sapling"):
+                ref["sapling_chances"] = cond.get("chances")
+    if ref["sapling_chances"] is None or ref["stick_chances"] is None:
+        raise ParseError(f"无法从 {path} 读取树苗/木棍 table_bonus 概率")
+    return ref
+
+
+def leaves_structure_problems(root: Path, modid: str, ref):
+    """Assert the three mod leaf tables mirror vanilla's three-pool oak-leaves shape."""
+    loot_dir = root / DATA_REL / modid / "loot_table" / "blocks"
+    files = sorted(loot_dir.glob("*_leaves.json"))
+    if not files:
+        raise ParseError(f"未找到任何树叶掉落表: {loot_dir}/*_leaves.json")
+    problems: list = []
+    for path in files:
+        rel = _rel(root, path)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        prefix = path.stem[: -len("_leaves")]
+        expect_leaf = f"{modid}:{path.stem}"
+        expect_sapling = f"{modid}:{prefix}_sapling"
+        pools = data.get("pools", []) or []
+
+        leaf_child = sapling_child = None
+        for entry in _iter_loot_entries(data):
+            if entry.get("name") == expect_leaf:
+                leaf_child = entry
+            elif entry.get("name") == expect_sapling:
+                sapling_child = entry
+
+        if leaf_child is None:
+            problems.append(f"{rel}: 缺少本体 entry '{expect_leaf}'")
+        else:
+            conds = leaf_child.get("conditions", []) or []
+            if len(conds) != 1 or not _is_shears_silk_anyof(conds[0]):
+                problems.append(f"{rel}: 本体 entry 缺少 entry 级 any_of[shears, silk_touch]")
+
+        if sapling_child is None:
+            problems.append(f"{rel}: 缺少该主题树苗 entry '{expect_sapling}'")
+        else:
+            chances = _entry_table_bonus(sapling_child)
+            if chances is None:
+                problems.append(f"{rel}: 树苗 entry 缺少 entry 级 table_bonus")
+            else:
+                if chances != ref["sapling_chances"]:
+                    problems.append(
+                        f"{rel}: 树苗 chances={chances} != 原版 {ref['sapling_chances']}")
+                if _is_degenerate_chances(chances):
+                    problems.append(f"{rel}: 树苗 chances 疑似必掉 {chances}")
+            if not any(c.get("condition") == "minecraft:survives_explosion"
+                       for c in sapling_child.get("conditions", []) or []):
+                problems.append(f"{rel}: 树苗 entry 缺少 survives_explosion")
+
+        stick_pool = stick_entry = None
+        for pool in pools:
+            for entry in pool.get("entries", []) or []:
+                if entry.get("name") == "minecraft:stick":
+                    stick_pool = pool
+                    stick_entry = entry
+        if stick_pool is None:
+            problems.append(f"{rel}: 缺少木棍池")
+        else:
+            pool_conds = stick_pool.get("conditions", []) or []
+            ok_inverted = (len(pool_conds) == 1
+                           and pool_conds[0].get("condition") == "minecraft:inverted"
+                           and _is_shears_silk_anyof(pool_conds[0].get("term")))
+            if not ok_inverted:
+                problems.append(f"{rel}: 木棍池缺少池级 inverted(any_of[shears, silk_touch])")
+            chances = _entry_table_bonus(stick_entry)
+            if chances is None:
+                problems.append(f"{rel}: 木棍 entry 缺少 entry 级 table_bonus")
+            else:
+                if chances != ref["stick_chances"]:
+                    problems.append(f"{rel}: 木棍 chances={chances} != 原版 {ref['stick_chances']}")
+                if _is_degenerate_chances(chances):
+                    problems.append(f"{rel}: 木棍 chances 疑似必掉 {chances}")
+            funcs = stick_entry.get("functions", []) or []
+            if not _has_set_count_uniform_1_2(funcs):
+                problems.append(f"{rel}: 木棍 functions 缺少 set_count uniform 1..2")
+            if not any(f.get("function") == "minecraft:explosion_decay" for f in funcs):
+                problems.append(f"{rel}: 木棍 functions 缺少 explosion_decay")
+    return problems, len(files)
+
+
+def sapling_model_problems(root: Path, modid: str):
+    """Resource-layer guard: every *_sapling block model is a cutout `cross`."""
+    assets = root / ASSETS_REL / modid
+    blockstates = sorted((assets / "blockstates").glob("*_sapling.json"))
+    if not blockstates:
+        raise ParseError(f"未找到任何树苗 blockstate: {assets / 'blockstates'}/*_sapling.json")
+    problems: list = []
+    for blockstate in blockstates:
+        name = blockstate.stem
+        model_path = assets / "models/block" / f"{name}.json"
+        if not model_path.is_file():
+            problems.append(f"{_rel(root, model_path)}: 缺少方块模型")
+            continue
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        if model.get("parent") != "minecraft:block/cross":
+            problems.append(f"{_rel(root, model_path)}: parent != minecraft:block/cross")
+        if model.get("render_type") != "minecraft:cutout":
+            problems.append(f"{_rel(root, model_path)}: render_type != minecraft:cutout")
+        item_path = assets / "models/item" / f"{name}.json"
+        if not item_path.is_file():
+            problems.append(f"{_rel(root, item_path)}: 缺少物品模型")
+    return problems, len(blockstates)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="建材资源与注册双向校验")
     parser.add_argument("--root", default=str(Path(__file__).resolve().parents[1]),
@@ -944,7 +1168,13 @@ def main() -> None:
         layer_word_diffs = layer_word_problems(root)
         stone_color_diffs, stone_summary = stone_color_problems(root, modid)
         blockstate_prop_diffs = blockstate_property_problems(root, building_specs, modid)
-    except (ParseError, json.JSONDecodeError, bd.FamilyDataError) as exc:
+        function_cond_diffs, loot_tables_scanned = function_condition_problems(root, modid)
+        sapling_model_diffs, saplings_checked = sapling_model_problems(root, modid)
+        with zipfile.ZipFile(gba.find_client_jar(root)) as zf:
+            vanilla_leaf_ref = _vanilla_leaf_reference(zf)
+        leaves_diffs, leaves_checked = leaves_structure_problems(root, modid, vanilla_leaf_ref)
+    except (ParseError, json.JSONDecodeError, bd.FamilyDataError,
+            KeyError, OSError, zipfile.BadZipFile) as exc:
         print("BUILDING ASSETS FAILED: 解析错误", file=sys.stderr)
         print(f"  - {exc}", file=sys.stderr)
         sys.exit(1)
@@ -1000,6 +1230,12 @@ def main() -> None:
           f"{stone_summary['pattern_over']} over)")
     print(f"[build] blockstate props : per-shape whitelist "
           f"({len(blockstate_prop_diffs)} illegal)")
+    print(f"[build] leaves loot  : {leaves_checked}/{leaves_checked} checked, "
+          f"{len(leaves_diffs)} over")
+    print(f"[build] loot fn conds : {loot_tables_scanned} tables scanned, "
+          f"{len(function_cond_diffs)} illegal")
+    print(f"[build] sapling model : cross + cutout "
+          f"({saplings_checked} checked, {len(sapling_model_diffs)} over)")
 
     problems = []
     if missing_java:
@@ -1028,6 +1264,15 @@ def main() -> None:
     if blockstate_prop_diffs:
         problems.append(("blockstate 属性越界", "variant property outside shape whitelist",
                          blockstate_prop_diffs))
+    if function_cond_diffs:
+        problems.append(("掉落函数条件层级错误",
+                         "table_bonus/random_chance under functions[*].conditions",
+                         function_cond_diffs))
+    if leaves_diffs:
+        problems.append(("树叶掉落结构错误", "leaf loot not vanilla-shaped", leaves_diffs))
+    if sapling_model_diffs:
+        problems.append(("树苗模型错误", "sapling block model not cross+cutout",
+                         sapling_model_diffs))
 
     if problems:
         print("BUILDING ASSETS FAILED", file=sys.stderr)
