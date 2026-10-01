@@ -245,6 +245,7 @@ Windows 一律用 `.\gradlew.bat` 前缀。
 | `.\gradlew.bat runData` | 执行 DataGen | 导出配方、模型、标签、语言包等 JSON |
 | `.\gradlew.bat runGameTestServer` | 无头 GameTest 服务器 | 跑集成逻辑用例,CI/本地自动化门禁 |
 | `.\gradlew.bat build` | 构建 jar 到 `build/libs/` | 封版、产出上传包 |
+| `python tools\gen_block_assets.py` | 资源生成（建筑方块贴图/模型/blockstate/掉落/配方/标签/lang） | 会写 `src\main\resources`；其中 `lang`/`tags` 为 **merge 语义**（只追加、不覆盖手写内容）；需 `pip install Pillow` 与原版 client jar |
 | `.\deploy.ps1`(或 `.\deploy.bat`) | 一键构建并自动热注入 jar 到 PCL 客户端版本 mods 目录 | 用 PCL 启动器联调、多客户端 / 光影测试 |
 | `.\gradlew.bat --refresh-dependencies` / `genSources` | 刷新依赖 / 生成源码 | IDE 无法解析形参名时 |
 
@@ -274,6 +275,9 @@ Windows 一律用 `.\gradlew.bat` 前缀。
 3. GameTest 全绿(`.\gradlew.bat runGameTestServer`)。
 4. DataGen 产物(`src/generated/resources/`)**已提交**。
 5. 未把开发期专属配置带进产物;`neoforge.mods.toml` 的 `version`/`license`/`modId`/依赖区间正确。
+6. **三个 Python 静态校验脚本必须全部 `exit 0`**:`tools\verify_tab_coverage.py`、`tools\verify_building_assets.py`、`tools\verify_ore_textures.py`。理由:本仓库**无测试基建**(`src/test/java` 不存在)、团队禁用 `runClient`/`runServer`/`runGameTestServer`,静态脚本是当前**主要的自动化门禁**;任一非零即视为门禁失败。
+
+> ⚠️ 本次新增条目(§8 的 `python tools\gen_block_assets.py` 行、§9 第 6 条)由 agent 于 2026-10-01 追加,待团队确认。
 
 - 可选:`spotlessApply` 格式化(团队自行决定是否引入)。
 - 注:单元测试(`src/test/java`,JUnit 5)**不加载** MC 引擎与注册表,只能测纯算法;任何依赖 `net.minecraft.*` 的代码只能用 GameTest。

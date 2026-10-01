@@ -2,7 +2,7 @@
 
 > **文档定位**：本文是**实现现状（as-built）**文档，回答「代码现在长什么样、谁调用谁」。
 > 玩法意图、路线图与逐项实现状态见 [`docs/DESIGN.md`](DESIGN.md)；版本矩阵、代码规约、热重载边界、质量门禁以根目录 [`AGENTS.md`](../AGENTS.md) 为准。
-> **最后更新**：2026-10-01（对齐 HEAD `833aa31`）。
+> **最后更新**：2026-10-01（对齐 HEAD `a755294`；同步建筑方块体系、双创造页与资源生成管线）。
 > **命名空间**：`weather_realm` · **显示名**：天象之境 / Weather Realm · **modId**：`weather_realm`。
 > **方法**：本文每条结构性断言均按最终代码逐条核对，标注文件路径与行号（行号为该文件总行数标注中的实际位置）。任何与代码不一致处，以代码为准。
 
@@ -16,7 +16,9 @@
 | 版本 | `1.0.0` | `gradle.properties:35` |
 | 自建维度 | `weather_realm:crystal_realm` | `ModDimensions.java:16`、`data/weather_realm/dimension/crystal_realm.json:2` |
 | 群系（3 个） | `crystal_plains`（水晶平原）/ `blazing_plains`（烈焰平原）/ `arid_wasteland`（干旱荒原） | `data/weather_realm/worldgen/biome/*.json` |
-| 主类 | `WeatherRealm`，**仅 42 行**，只做注册编排与配置注册 | `WeatherRealm.java:23-41` |
+| 创造模式标签页（2 个） | `building_blocks`（建筑方块页，9 类）+ `items`（物品页，6 类） | `ModCreativeTabs.java:155-169` |
+| 建筑方块（104 件） | 95 件建筑（石族浅/深衍生 + 木族补齐 + 灯笼 + 装饰）+ 9 件生态小物（晶簇/叠层/尖锥） | `ModBuildingBlocks.java`、`tools/biome_data.py` |
+| 主类 | `WeatherRealm`，**仅 40 行**，只做注册编排与配置注册 | `WeatherRealm.java:23-39` |
 
 ### 1.1 核心玩法一图流
 
@@ -57,10 +59,11 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 
 | 文件（行数） | 职责 |
 | :- | :- |
-| `WeatherRealm.java` (42) | `@Mod` 入口（`:14`）；`MODID`/`LOGGER`；构造器按固定顺序调用各 `Mod*` 注册（`:25-33`），注册创造标签监听（`:36`）与 COMMON/CLIENT 配置（`:39-40`）。 |
-| `ModBlocks.java` (444) | 方块 `DeferredRegister.Blocks`（`:51`）；坚冰木/焦木/风化木族、祭坛核心、传送门、地质与 54 个矿石方块、三群系植被；含 `GENERATED_ORES` 列表与 `register(IEventBus)`（`:441`）。 |
-| `ModItems.java` (256) | 物品 `DeferredRegister.Items`（`:51`）；全部 BlockItem、晶石、手记、天象图、气候碎片、护甲/工具、刷怪蛋、食物、动物掉落；`ARMOR_MATERIALS`（`:121`）；`register`（`:249`）与 `registerArmorMaterials`（`:253`）。 |
-| `ModCreativeTabs.java` (143) | 创造标签 `weather_realm_tab`（`:27`，图标为冰晶花）；`displayItems` 逐项登记；`addCreative` 把冻土建材加入原版「建筑方块」页（`:137`）。 |
+| `WeatherRealm.java` (40) | `@Mod` 入口（`:14`）；`MODID`/`LOGGER`；构造器按固定顺序调用各 `Mod*` 注册（`:25-34`，含 `ModBuildingBlocks`）与 COMMON/CLIENT 配置（`:37-38`）；**已无** `addCreative` 创造标签监听。 |
+| `ModBlocks.java` (444) | 方块 `DeferredRegister.Blocks`（`:51`）；**手写**坚冰木族（`:130-`）、焦木/风化木原木与树叶、祭坛核心、传送门、地质与 54 个矿石方块、三群系植被；含 `GENERATED_ORES` 列表（`:367`）与 `register(IEventBus)`（`:441`）。新增石族/木族衍生件已移至 `ModBuildingBlocks`。 |
+| `ModBuildingBlocks.java` (256) | **建筑方块族工厂**（本次新增）：族记录 `StoneLayer`/`StoneFamily`/`WoodFamily`/`LanternSet`/`DecorationSet`/`EcoSet`（`:55-85`）+ 五个族列表（`:87-91`）；族工厂 `layer`（`:93`）/`woodFamily`（`:117`）/`lanternSet`（`:155`）/`decorationSet`（`:163`）/`ecoset`（`:187`）；`static {}`（`:224-251`）登记三石族（60）、两木族（20）、三灯笼、三装饰、三生态；`register`（`:253`）。 |
+| `ModItems.java` (327) | 物品 `DeferredRegister.Items`（`:53`）；全部 BlockItem（含 `ModBuildingBlocks` 各族与生态小物的**批量**注册，`:252-318`）、晶石、手记、天象图、气候碎片、护甲/工具、刷怪蛋、食物、动物掉落；`ARMOR_MATERIALS`（`:123`）；`register`（`:320`）与 `registerArmorMaterials`（`:324`）。 |
+| `ModCreativeTabs.java` (185) | **两个**创造页：`building_blocks`（`:155-161`，图标 `permafrost`）与 `items`（`:163-169`，图标 `blizzard_crystal`，沿用 `itemGroup.weather_realm`）；分类是纯数据表 `TabCategory`（`:34`）——`BUILDING_CATEGORIES`（`:38`，9 类）/`ITEM_CATEGORIES`（`:133`，6 类），由 `acceptCategories`（`:171`）遍历输出；旧 `weather_realm_tab` 与 `addCreative` 均已删除。 |
 | `ModBlockProperties.java` (105) | 方块属性工厂（`stoneLike` / 各矿石 / 木柱 / 植物），消除重复的属性配方。 |
 | `ModStructureTypes.java` (38) | 结构类型 + 结构处理器注册：`frost_village`（`:27`）、`frost_wood_replace`（`:31`）。 |
 | `ModSounds.java` (28) | 音效注册：`music.biome.crystal_plains`（`:20`）。 |
@@ -91,6 +94,7 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 | `FrostSaplingBlock.java` (116) | 坚冰木树苗；骨粉生成 6–8 格高锥形冷杉（`:56-83`）。 |
 | `FrostLeavesBlock.java` (21) | 坚冰木树叶（原版落叶逻辑）。 |
 | `FrostLogBlock.java` (21) | 坚冰木/焦木/风化木共用轴向柱方块。 |
+| `WeatherSpikeBlock.java` (137) | **天象尖锥**（本次新增自定义类）：`extends Block implements SimpleWaterloggedBlock`；状态 `thickness`（TIP/FRUSTUM/MIDDLE/BASE，枚举 `:56`）× `vertical_direction` × `waterlogged` = 16 组合；逐段收窄碰撞箱 `SHAPES`（`:46-51`）、`getStateForPlacement`（`:95`）、`canSurvive`（`:105`）、支撑消失时回落空气的 `updateShape`（`:112-121`）。生态小物中的晶簇/叠层则直接复用原版 `AmethystClusterBlock`/`SnowLayerBlock`，无自定义类。 |
 
 ### 2.3 `item/`
 
@@ -163,9 +167,10 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 
 | 类 | 注册表 | 入口 |
 | :- | :- | :- |
-| `ModBlocks` | `BLOCKS`（方块 + BlockSetType/WoodType） | `ModBlocks.register(bus)` |
+| `ModBlocks` | `BLOCKS`（手写方块 + `BlockSetType`/`WoodType`） | `ModBlocks.register(bus)` |
+| `ModBuildingBlocks` | `BLOCKS`（新增建筑/生态族方块 + `scorched`/`arid` 的 `BlockSetType`/`WoodType`） | `ModBuildingBlocks.register(bus)` |
 | `ModItems` | `ITEMS`；额外 `ARMOR_MATERIALS` | `ModItems.register(bus)` / `registerArmorMaterials(bus)` |
-| `ModCreativeTabs` | `CREATIVE_MODE_TABS` | `ModCreativeTabs.register(bus)` + `modEventBus.addListener(ModCreativeTabs::addCreative)` |
+| `ModCreativeTabs` | `CREATIVE_MODE_TABS`（两个页签，**无** `addCreative`） | `ModCreativeTabs.register(bus)` |
 | `ModParticles` | `PARTICLE_TYPES` | `ModParticles.register(bus)` |
 | `ModSounds` | `SOUND_EVENTS` | `ModSounds.register(bus)` |
 | `ModEntities` | `ENTITY_TYPES` | `ModEntities.ENTITY_TYPES.register(bus)` |
@@ -174,32 +179,32 @@ crystal_realm：三群系勘探（永冻挖 blizzard_crystal / 燃焰挖 blaze_c
 
 ### 3.2 `WeatherRealm` 构造器调用顺序（以代码为准）
 
-`WeatherRealm.java:25-40` 顺序固定为：
+`WeatherRealm.java:25-38` 顺序固定为：
 
 ```
-ModBlocks.register        // BLOCKS
-ModItems.register         // ITEMS
-ModCreativeTabs.register  // CREATIVE_MODE_TABS
-ModParticles.register     // PARTICLE_TYPES
-ModSounds.register        // SOUND_EVENTS
-ModItems.registerArmorMaterials // ARMOR_MATERIALS
+ModBlocks.register                // BLOCKS
+ModBuildingBlocks.register        // BUILDING BLOCKS（必须早于 ModItems）
+ModItems.register                 // ITEMS
+ModCreativeTabs.register          // CREATIVE_MODE_TABS
+ModParticles.register             // PARTICLE_TYPES
+ModSounds.register                // SOUND_EVENTS
+ModItems.registerArmorMaterials   // ARMOR_MATERIALS
 ModEntities.ENTITY_TYPES.register // ENTITY_TYPES
-ModStructureTypes.register // STRUCTURE_TYPES + STRUCTURE_PROCESSORS
-ModBlockEntities.register  // BLOCK_ENTITY_TYPE
-modEventBus.addListener(ModCreativeTabs::addCreative)
+ModStructureTypes.register        // STRUCTURE_TYPES + STRUCTURE_PROCESSORS
+ModBlockEntities.register         // BLOCK_ENTITY_TYPE
 modContainer.registerConfig(COMMON, WeatherRealmConfig.COMMON_SPEC)
 modContainer.registerConfig(CLIENT, WeatherRealmConfig.CLIENT_SPEC)
 ```
 
-该顺序保留了拆分前单体类的声明顺序，注释见 `WeatherRealm.java:24`。
+该顺序保留了拆分前单体类的声明顺序，注释见 `WeatherRealm.java:24`；`ModBuildingBlocks` 必须先于 `ModItems`——后者的 `static {}` 要遍历前者的族列表批量生成 BlockItem（`ModItems.java:267-318`）。
 
 ### 3.3 新增一个方块 / 物品，要改哪几个文件
 
-1. `ModBlocks.java`：`BLOCKS.registerSimpleBlock("id", props)` 或 `BLOCKS.registerBlock(...)`；复用 `ModBlockProperties` 的属性工厂。
-2. `ModItems.java`：`ITEMS.registerSimpleBlockItem("id", ModBlocks.X)`（两格高/门用 `DoubleHighBlockItem`）。
-3. `ModCreativeTabs.java`：在 `displayItems` 里 `output.accept(...)`（若要在本模组页显示）。
-4. 资源：`assets/weather_realm/blockstates/<id>.json`、`models/block|item/<id>.json`、`textures/block|item/<id>.png`、`lang/zh_cn.json` + `lang/en_us.json`。
-5. 可选数据：`data/weather_realm/loot_table/blocks/<id>.json`、`recipe/<id>.json`、`data/minecraft/tags/block/...`（可挖性/木族/花等）。
+1. `ModBlocks.java`（手写单件）或 `ModBuildingBlocks.java`（**族工厂**，成套建材推荐）：注册方块对象；复用 `ModBlockProperties` 的属性工厂。`ModBuildingBlocks` 的族工厂会同时登记到族列表，供 `ModItems` 与资源管线复用。
+2. `ModItems.java`：`ITEMS.registerSimpleBlockItem("id", ...)`（两格高/门用 `DoubleHighBlockItem`）；若走 `ModBuildingBlocks`，族由 `ModItems.BUILDING_BLOCK_ITEMS` 批量注册（`:252-318`），无需逐件补。
+3. `ModCreativeTabs.java`：把 id 加进 `BUILDING_CATEGORIES`（建筑方块页）或 `ITEM_CATEGORIES`（物品页）的对应 `TabCategory`，**列表次序即显示次序**；`acceptCategories` 自动输出。新增 item 必须在此恰好出现一次（`verify_tab_coverage.py` 会卡）。
+4. 资源：**成套建材不手写**，走 `python tools\gen_block_assets.py`（数据流见 §5.6）；其余单件资源仍放 `assets/weather_realm/blockstates|models|textures` 或 `lang/{zh_cn,en_us}.json`。
+5. 可选数据：`data/weather_realm/loot_table/blocks/<id>.json`、`recipe/<id>.json`、`data/minecraft/tags/block/...`（可挖性/木族/花等）；成套建材由管线按 spec 的 `tool`/`needs`/`tags` 字段合并。
 6. **必须重启客户端**（静态注册表在启动期冻结，见 `AGENTS.md` §6.1 与 §10 `Registry is already frozen`）。
 
 ---
@@ -321,11 +326,49 @@ entityInside (:82)  canUsePortal(false) → entity.setAsInsidePortal(this, pos) 
   - 浅/深层岩分支**故意不做 `abovePreliminarySurface` 包裹**，实现整柱替换，从而让自定义 `ore_replaceables` 标签下的全套矿石生成。
   - 群系 `ResourceKey` 常量在 `:51-63`。
 
+### 5.6 建筑方块资源生成管线（Python，本次新增）
+
+建材的**唯一权威**是 `tools/biome_data.py` 的族数据表；Java 只负责方块/物品**对象**的注册，客户端与数据包资源全部由 `tools/gen_block_assets.py` 生成。两侧共享同一命名规则，顺序一致性由 `ModCreativeTabs` 的 id 表与族列表共同约定（可由校验脚本比对）。
+
+```
+biome_data.py 数据表（族声明）
+  ├─ STONE_BASES / WOOD_BASES / _LANTERN_BASES / _DECORATION_BASES / _ECO_BASES（`:367-407`）
+  ├─ BUILDING_FAMILIES（`:411-416`）：kind ∈ stone|wood|lantern|decoration；family_kind 校验（`:437`）
+  └─ 展开函数：stone_specs（`:492`）/ wood_specs（`:548`）/ lantern_specs（`:602`）/
+              decoration_specs（`:614`）/ cluster_specs（`:650`）/ layer_specs（`:667`）/ spike_specs（`:687`）
+       │  每个 spec 携带 name / shape / en+zh / loot 策略 / tool / needs / tags / textures / item
+       ▼
+gen_block_assets.py 引擎
+  ├─ collect_building_specs（`:739`）把 BUILDING_FAMILIES 展开成具体 spec
+  ├─ write_block_client（`:277`）按 spec["shape"]（回退 spec["model"]）分支生成：
+  │    本次新增 11 种形状模板 → stairs(:338) / slab(:348) / wall(:361) / fence(:371) /
+  │    fence_gate(:379) / door(:390) / trapdoor(:415) / button(:424) / pressure_plate(:432) /
+  │    lantern(:439) / pane 即玻璃板(:448)；
+  │    生态小物 3 分支 → cluster(:462，12 状态) / layer(:477，16 状态) / spike(:494，16 状态)；
+  │    产出 blockstates + models/block（含 _inner/_top/_side/... 子模型）+ 16×16 贴图
+  │    （从原版 client jar 重新着色，仓库不存手绘原图）
+  ├─ write_block_loot（`:541`）：self / ore / crystal_ore / leaves / glass 五种策略 → data/weather_realm/loot_table/blocks/
+  ├─ write_tags（`:572`）：读 spec 的 tool/needs/tags 字段，merge 进 data/minecraft/tags/...（新建 block/walls.json）
+  ├─ write_lang（`:647`）：把 en/zh 名 update 进 assets/weather_realm/lang/{en_us,zh_cn}.json
+  └─ write_recipes（`:715`）：由 bd.building_recipes()（`:804`）写 91 条 data/weather_realm/recipe/*.json
+
+merge 语义（merge_tag `:139`）：只追加缺失 id、保留既有内容；若写出的字节与原文件完全相同则**不落盘**，从而既保住手写 LF 标签文件的换行风格，也修复了此前会把 18 个手写 LF 文件重写成 CRLF 的缺陷。
+lang 亦为 dict.update merge（`:663-667`），不覆盖手写键。
+```
+
+**归属划分（重要）**：
+
+| 归 Python 管线管（生成/合并，可被脚本重写） | 归手写管（禁止管线改写） |
+| :- | :- |
+| 新建石族/木族/灯笼/装饰/生态小物的 blockstate、models、贴图、掉落表、配方、lang/标签追加 | `ModBlocks` 既有手写方块（坚冰木族、植被、矿石…）的资源；结构/世界生成 JSON；`patchouli_books`；`sounds`；`weather_altar_core`/`weather_pedestal` 等单件 |
+
+> 本工程**不使用 Java DataGen**：`src/generated/resources/` 仍为空，管线直接写进 `src/main/resources`（沿用既有 105 方块的先例）。运行 `python tools\gen_block_assets.py` 会**修改 `src/main/resources`**，需要 `pip install Pillow` 且能定位原版 client jar（`--client-jar` 或环境变量 `MC_CLIENT_JAR`）。
+
 ---
 
 ## 6. 配置（`config/WeatherRealmConfig.java`，80 行）
 
-两个 spec 均在构造器注册（`WeatherRealm.java:39-40`）。
+两个 spec 均在构造器注册（`WeatherRealm.java:37-38`）。
 
 ### 6.1 COMMON（`COMMON_SPEC`，`:55`）
 
@@ -377,6 +420,10 @@ entityInside (:82)  canUsePortal(false) → entity.setAsInsidePortal(this, pos) 
 | `.\gradlew.bat runServer` | 独立 Dedicated Server | 验证双端隔离 |
 | `.\gradlew.bat runGameTestServer` | 无头 GameTest 服务器 | 质量门禁 |
 | `.\gradlew.bat runData` | DataGen | 输出 `src/generated/resources/`（当前目录为空，无 DataGen provider） |
+| `python tools\gen_block_assets.py` | 生成/合并建筑方块资源（本次新增） | 写 `src/main/resources/{assets,data}`；`lang`/`tags` 为 merge；需 Pillow |
+| `python tools\verify_tab_coverage.py` | 创造页覆盖率校验（本次新增） | 每个已注册 item 恰好收录一次；exit 0 |
+| `python tools\verify_building_assets.py` | 建材双向校验（本次新增） | 数据表 ↔ Java ↔ 资源 ↔ lang/标签；exit 0 |
+| `python tools\verify_ore_textures.py` | 矿石贴图校验（既有） | 复合矿石背景与岩石逐像素一致；exit 0 |
 | `.\deploy.ps1` / `.\deploy.bat` | 一键构建 + 注入 PCL mods | 见下 |
 
 ### 8.1 `deploy.ps1` 工作流（当前实现）
@@ -388,6 +435,20 @@ entityInside (:82)  canUsePortal(false) → entity.setAsInsidePortal(this, pos) 
 5. 覆盖复制到目标 `mods\`（默认 `C:\Users\31087\Desktop\mc\.minecraft\versions\1.21.1-NeoForge_21.1.252\mods\`，`:36`），并提示**必须完全重启客户端**（`:203-211`）。
 
 > **改动收尾标准工作流（由团队负责人指定）**：任何代码改动完成后，标准收尾 = **先 `.\gradlew.bat build` 通过 → 再 `.\deploy.ps1` 部署**到 PCL 客户端 mods 目录；部署前必须**完全退出** Minecraft 客户端。**只 build 不部署视为未完成**。纯 Java 逻辑迭代仍可走 IDE HotSwap，但每次收尾都必须 build + deploy。
+
+### 8.2 静态校验脚本（本次新增）
+
+本仓库**无测试基建**（`src/test/java` 不存在）且团队禁用 `runClient`/`runServer`/`runGameTestServer`，因此自动化门禁以**只用标准库的 Python 静态脚本**为主；三者必须全部 `exit 0`，任一非零即视为门禁失败。
+
+| 脚本 | 断言什么 | 怎么失败 |
+| :- | :- | :- |
+| `tools/verify_tab_coverage.py` | 已注册 item 集合（`ModItems.java` 字面注册 + `ModBlocks` 矿石模板 + `biome_data.all_building_block_ids()`）与 `ModCreativeTabs` 的 `TabCategory` id 表**双向相等**、无重复；恰好 **2 个**页签；每个页签标题键（`itemGroup.*`）在每个 `lang/*.json` 存在 | 缺失/重复/多余 id、页签数 ≠ 2、lang 键缺失；**解析到 0 个 id 直接判失败**（防正则失效后假绿） |
+| `tools/verify_building_assets.py` | `biome_data` 数据表 ↔ `ModBlocks`/`ModItems`/`ModBuildingBlocks`/`ModCreativeTabs` 字面 id ↔ 生成资源（blockstates / 方块与物品模型 / **精确**逐形状文件名 / 掉落表 / 物品贴图）↔ 中英 lang 键；按 spec 的 `tool`/`needs`/`tags` 断言原版标签成员；另有**手写标签保留基线**，防止再生把既有手写 id 冲掉 | 任一方向差异、模型文件缺失（按精确 stem，不把 `<name>_stairs` 当 `<name>` 蒙混）、门上下贴图未区分、手写标签被删；解析到 0 个 id 或命名模式自检失败即失败 |
+| `tools/verify_ore_textures.py` | 复合矿石贴图的**非矿物像素**与其岩石贴图逐像素一致；矿物掩码取自原版矿石 × 原版岩石（stone/deepslate）调色板 | 尺寸/alpha 异常，或背景像素与岩石不一致 |
+
+### 8.3 本次工程收尾工作流
+
+每阶段收尾 = **`.\gradlew.bat build` 通过 → `verify_tab_coverage.py` / `verify_building_assets.py` / `verify_ore_textures.py` 三个脚本全部 `exit 0` → `.\deploy.ps1` 部署**（部署前完全退出客户端，见 §8.1 与 `AGENTS.md` §8.1）。本次四个阶段均据此收尾，最终产物 jar 2,171,712 B。
 
 ---
 

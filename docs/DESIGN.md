@@ -5,7 +5,7 @@
 > **技术权威**：版本矩阵、代码规约、质量门禁、热重载边界一律以根目录 [`AGENTS.md`](../AGENTS.md) 为准；本文若与其冲突，以 `AGENTS.md` 为准。
 > **命名空间**：全篇统一为 **`weather_realm`**。历史 GDD 通篇使用的 `examplemod` 为早期误用，已在本文修正；旧 GDD / 旧实施计划已随本次文档收敛清理，不再随仓库分发。
 > **状态**：🟢 可玩纵切（入界 → 采集 → 传送门 → 群系探索 → 调谐）；终局内容多为愿景。
-> **最后更新**：2026-09-30。
+> **最后更新**：2026-10-01（追加建筑方块体系与双创造页；2026-09-30 为前一基线）。
 
 ## 状态图例
 
@@ -30,9 +30,10 @@
 | 极域天象图（手持地图） | ✅ | 复用原版地图渲染，仅在天象之境可用 |
 | 《古代天气研究手记》+ Patchouli 四篇 | ✅ | Patchouli 可选，缺失时聊天栏降级 |
 | 坚冰木族 13 件套 + 冰晶装备/工具 | ✅ | 配方齐全 |
+| 建筑方块体系（三主题石族 + 木族 + 灯笼 + 装饰 + 生态小物） | ✅ | 本次新增 104 件方块（95 建筑 + 9 生态小物），创造页拆为「建筑方块 / 物品」两页 |
 | 4 种冰原动物（羊/牛/猪/猫） | ✅ | 刷新、渲染、掉落齐备 |
 | 异界地表结构（村庄 / 避难所 / 熔岩遗迹 / 烈火祭坛） | ✅ | 村庄经材质 + 生物替换处理器生成 |
-| 燃焰 / 风沙木族与植被 | 🟡 | 原木/树叶/植被有，木板等衍生件与配方缺失 |
+| 燃焰 / 风沙木族与植被 | ✅ | 木族补齐 13 件套 + 配方；植被原有（详见 §7.3 / §7.8） |
 | 失温 / 霜冻值系统 | ⬜ | 无 `HypothermiaManager` / `frost_resistance` / `frostbite` |
 | 动态风暴潮周期 | ⬜ | 无 `BlizzardCycleManager`，天气仅由 UI 手动切换 |
 | 风暴能量（碎片 / 充能核 / 引风瓶 / 基座） | ⬜ | 代码中零命中 |
@@ -124,8 +125,8 @@
 | 气候 | `temperature=2.0`、`downfall=0`、无降水 | `worldgen/biome/blazing_plains.json` |
 | 地表 | y ≥ 8 `fire_stone` → y ≤ 0 `deep_fire_stone`（deepslate 式噪声过渡） | `world/ModSurfaceRules.java` |
 | 专属矿 | 火石烈火晶石矿 → `blaze_crystal` | `placed_feature/ore_fire_stone_blaze_crystal.json` |
-| 木族/植被 | 焦木（原木/木/去皮原木/树叶）、灰烬兰、烈焰草幼芽、火晶花 | `placed_feature/{scorched_tree,cinder_bloom,flame_sprout,fire_flower}.json` |
-| 缺失 | **无生物刷新**（`spawners` 为空）、**无热害/灼烧机制**、木族无木板及配方 | 同上 JSON 与 `recipe/` 目录 |
+| 木族/植被 | 焦木 13 件套（原木/木/去皮原木/去皮木/木板/楼梯/台阶/栅栏/栅栏门/门/活板门/压力板/按钮，本次补齐）+ 灰烬兰、烈焰草幼芽、火晶花 | `placed_feature/{scorched_tree,cinder_bloom,flame_sprout,fire_flower}.json`、`recipe/scorched_*.json` |
+| 缺失 | **无生物刷新**（`spawners` 为空）、**无热害/灼烧机制**（木族衍生件已于本次补齐） | 同上 JSON 与 `recipe/` 目录 |
 
 > 设计愿景：烈焰平原应是「反向失温」——高温灼烧、岩浆裂隙与耐火装备链。目前只完成了**地形与资源层**。
 
@@ -137,8 +138,8 @@
 | 气候 | `temperature=1.5`、`downfall=0`、无降水 | `worldgen/biome/arid_wasteland.json` |
 | 地表 | y ≥ 8 `weathered_sandstone` → y ≤ 0 `deep_weathered_sandstone`（deepslate 式噪声过渡） | `world/ModSurfaceRules.java` |
 | 专属矿 | 风化砂石风沙晶石矿 → `wind_crystal` | `placed_feature/ore_weathered_sandstone_wind_crystal.json` |
-| 木族/植被 | 风化木（原木/木/去皮原木/树叶）、沙丘花、风生草、风沙灌木 | `placed_feature/{arid_tree,dune_flower,wind_sprout,arid_bush}.json` |
-| 缺失 | **无生物刷新**、**无沙暴/风蚀机制**、木族无木板及配方 | 同上 JSON 与 `recipe/` 目录 |
+| 木族/植被 | 风化木 13 件套（原木/木/去皮原木/去皮木/木板/楼梯/台阶/栅栏/栅栏门/门/活板门/压力板/按钮，本次补齐）+ 沙丘花、风生草、风沙灌木 | `placed_feature/{arid_tree,dune_flower,wind_sprout,arid_bush}.json`、`recipe/arid_*.json` |
+| 缺失 | **无生物刷新**、**无沙暴/风蚀机制**（木族衍生件已于本次补齐） | 同上 JSON 与 `recipe/` 目录 |
 
 ### 3.4 表层过渡方块 🟡
 
@@ -259,8 +260,8 @@
 | 木族 | 中文前缀 | 已注册件 | 状态 |
 | :- | :- | :- | :- |
 | `frost_*` | 坚冰木 | 原木/木/去皮原木/去皮木/木板/楼梯/台阶/栅栏/栅栏门/门/活板门/压力板/按钮 + 树叶/树苗 | ✅ 13 件套 + 配方 |
-| `scorched_*` | 焦木 | 原木/木/去皮原木/树叶 | 🟡 缺木板及衍生件、缺配方 |
-| `arid_*` | 风化木 | 原木/木/去皮原木/树叶 | 🟡 缺木板及衍生件、缺配方 |
+| `scorched_*` | 焦木 | 原木/木/去皮原木/去皮木/木板/楼梯/台阶/栅栏/栅栏门/门/活板门/压力板/按钮 + 树叶 | ✅ 13 件套 + 配方（本次补齐衍生件） |
+| `arid_*` | 风化木 | 原木/木/去皮原木/去皮木/木板/楼梯/台阶/栅栏/栅栏门/门/活板门/压力板/按钮 + 树叶 | ✅ 13 件套 + 配方（本次补齐衍生件） |
 
 - 结构生成期由 `FrostWoodProcessor` 把原版**云杉族 → 坚冰木族**、**猪/猫 → 冰原猪/冰原猫**替换，证据：`world/FrostWoodProcessor.java`、`world/FrostVillageStructure.java`。
 
@@ -300,6 +301,34 @@
 - 群系音乐：`music.weather_realm.crystal_plains` → `unyielding_icy_wind.ogg` ✅。
 - 粒子：`blizzard_snow` ✅；GDD 另有 `frost_vortex` / `conduit_beam` / `reactor_ray` 等 ⬜。
 - 物品提示描述行（`item.*.desc`）由 `client/ClientTooltipHandler.java` 渲染 ✅。
+
+### 7.8 建筑方块体系（本次新增 104 件）
+
+为了让「天灾即资源」落到**建造**这一层，三主题各获得一套可建造的建材族；石族由「浅层 / 深层」两套衍生件构成，木族与坚冰木对齐为 13 件套。创造模式因此由单页拆为「天象之境·建筑方块」与「天象之境」两页。设计全文见 [`docs/design/building-blocks-and-tabs.md`](design/building-blocks-and-tabs.md)，数据表与生成管线见 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §5.6。
+
+**石族**（每主题浅/深各一套；深层无 `_pillar` 与 `_cracked_bricks`）：
+
+| 主题 | 浅层基岩 | 深层基岩 | 每套衍生件 |
+| :- | :- | :- | :- |
+| 永冻 | `permafrost` | `deep_permafrost` | 浅 11 件 / 深 9 件：polished(+stairs/slab/wall) / bricks(+stairs/slab/wall) / chiseled / （浅层另有 cracked_bricks、pillar） |
+| 燃焰 | `fire_stone` | `deep_fire_stone` | 同上 |
+| 风沙 | `weathered_sandstone` | `deep_weathered_sandstone` | 同上 |
+
+**木族**：焦木 `scorched_*`、风化木 `arid_*` 补齐为 13 件套（见 §7.3）。
+
+**灯笼**：`frost_lantern` / `blaze_lantern` / `wind_lantern`，每主题 1 款，可悬挂或放置、常亮。
+
+**装饰细部**：每主题 `glass` / `glass_pane` / `grate` / `chain` 各 1 件。
+
+**生态小物**（每主题 3 件，塑造极端环境的地表美术）：
+
+| 形状 | 方块 | 设计意图 |
+| :- | :- | :- |
+| 可附着晶簇 | `*_crystal_cluster`（frost/blaze/wind） | 让矿脉在洞壁/崖面自然「长出来」，强化资源可读性 |
+| 叠层覆盖物 | `frost_snow_layer` / `blaze_ash_layer` / `wind_sand_layer` | 可叠高 1~8 层的地表薄层，做堆积感 |
+| 尖锥 | `*_spike`（frost/blaze/wind） | 朝上/朝下的收窄尖锥，做冰锥/石笋/风蚀地貌 |
+
+> 以上 95 件建筑 + 9 件生态 = **104 件**均为本次新增；配套 91 条配方与掉落表由资源管线生成，均已在创造页归类。
 
 ---
 
@@ -342,7 +371,7 @@
 | # | 事项 | 说明 | 涉及 |
 | :- | :- | :- | :- |
 | R1 | **给气象祭坛接上 `structure_set`** | 目前祭坛不自然生成，是最大「资源白做」问题；注意村庄内注入需 `BiomeModifier`/池接线，勿覆盖原版村庄 | `worldgen/structure_set/weather_altar.json`（新建）、`village/altar_pool.json` 接线 |
-| R2 | 焦木 / 风化木补齐木板、楼梯、门等衍生件 + 配方 | 与坚冰木族对齐 | `ModBlocks.java` / `ModItems.java`、`recipe/` |
+| R2 | ~~焦木 / 风化木补齐木板、楼梯、门等衍生件 + 配方~~ **已完成（本次）** | 已与坚冰木族对齐（13 件套 + 配方） | `ModBlocks.java` / `ModBuildingBlocks.java`、`recipe/` |
 | R3 | 燃焰 / 风沙群系补生物或环境机制 | 至少让两片群系「有威胁、有回报」，避免空跑 | `worldgen/biome/*.json` |
 | R4 | 确认 `frost_moss` / `dry_turf` / `volcanic_ash` 是否参与世界生成 | 若否，补地物或改为合成获得 | `placed_feature/` |
 | R5 | ~~清理模板残留 `Config.java`~~ **已完成** | 模板 `Config.java` 已删除，替换为 `config/WeatherRealmConfig.java`（COMMON + CLIENT 两个 `ModConfigSpec`） | 无 |
