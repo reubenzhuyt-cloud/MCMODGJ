@@ -352,3 +352,189 @@ def leaves_loot(block):
         ],
         "random_sequence": f"{MODID}:blocks/{block}",
     }
+
+
+# ============================================================================
+# 建筑方块族（子项目 C）/ Building-block families
+# ============================================================================
+THEME_ORDER = ["frost", "fire", "wind"]
+
+FROST_STONE_PROFILE = dict(target_hue=0.55, sat_floor=0.10, sat_mul=0.55, val_mul=1.02,
+                           protect_sat=None, speck_hue_shift=0.0)
+FROST_DEEP_PROFILE = dict(target_hue=0.55, sat_floor=0.10, sat_mul=0.50, val_mul=0.62,
+                          protect_sat=None, speck_hue_shift=0.0)
+
+STONE_BASES = [
+    dict(theme="frost", name="permafrost", deep="deep_permafrost",
+         en="Permafrost", zh="冻土", deep_en="Deep Permafrost", deep_zh="深层冻土",
+         stone_profile=FROST_STONE_PROFILE, deep_profile=FROST_DEEP_PROFILE),
+    dict(theme="fire", name="fire_stone", deep="deep_fire_stone",
+         en="Fire Stone", zh="火石", deep_en="Deep Fire Stone", deep_zh="深层火石",
+         stone_profile=THEMES[0]["stone_profile"], deep_profile=THEMES[0]["deep_profile"]),
+    dict(theme="wind", name="weathered_sandstone", deep="deep_weathered_sandstone",
+         en="Weathered Sandstone", zh="风化砂石",
+         deep_en="Deep Weathered Sandstone", deep_zh="深层风化砂石",
+         stone_profile=THEMES[1]["stone_profile"], deep_profile=THEMES[1]["deep_profile"]),
+]
+
+WOOD_BASES = [
+    dict(theme="fire", prefix="scorched", en="Scorched", zh="焦木",
+         planks_src="block/oak_planks", profile=THEMES[0]["wood_profile"],
+         log="scorched_log", stripped_log="stripped_scorched_log"),
+    dict(theme="wind", prefix="arid", en="Arid", zh="风化木",
+         planks_src="block/oak_planks", profile=THEMES[1]["wood_profile"],
+         log="arid_log", stripped_log="stripped_arid_log"),
+]
+
+# Phase B 为空；Phase C 用真实族填充。
+BUILDING_FAMILIES = []
+
+
+def build_stone_families():
+    return list(STONE_BASES)
+
+
+def build_wood_families():
+    return list(WOOD_BASES)
+
+
+# (suffix, en_suffix, zh_suffix, model, needs_parent_model)
+_SHALLOW_DERIVED = [
+    ("polished", "Polished", "磨制", "cube_all", False),
+    ("polished_stairs", "Polished Stairs", "磨制楼梯", "stairs", True),
+    ("polished_slab", "Polished Slab", "磨制台阶", "slab", True),
+    ("polished_wall", "Polished Wall", "磨制墙", "wall", True),
+    ("bricks", "Bricks", "砖", "cube_all", False),
+    ("brick_stairs", "Brick Stairs", "砖楼梯", "stairs", True),
+    ("brick_slab", "Brick Slab", "砖台阶", "slab", True),
+    ("brick_wall", "Brick Wall", "砖墙", "wall", True),
+    ("cracked_bricks", "Cracked Bricks", "裂纹砖", "cube_all", False),
+    ("chiseled", "Chiseled", "雕纹", "cube_all", False),
+    ("pillar", "Pillar", "柱", "pillar", True),
+]
+_DEEP_DERIVED = [d for d in _SHALLOW_DERIVED if d[0] not in ("cracked_bricks", "pillar")]
+
+
+def _stone_display(base_en, base_zh, suffix_en, suffix_zh):
+    # 磨制/雕纹 为限定词前置，其余为族名前置，与设计文档 §9.3 样例一致。
+    if suffix_en in ("Polished", "Chiseled"):
+        return f"{suffix_en} {base_en}", f"{suffix_zh}{base_zh}"
+    return f"{base_en} {suffix_en}", f"{base_zh}{suffix_zh}"
+
+
+def _is_deep(name):
+    return name.startswith("deep_")
+
+
+def stone_specs(family):
+    specs = []
+    for base_name, base_en, base_zh, profile, is_deep in (
+            (family["name"], family["en"], family["zh"], family["stone_profile"], False),
+            (family["deep"], family["deep_en"], family["deep_zh"], family["deep_profile"], True)):
+        derived = _DEEP_DERIVED if is_deep else _SHALLOW_DERIVED
+        for suffix, sen, szh, model, has_parent in derived:
+            name = f"{base_name}_{suffix}"
+            en, zh = _stone_display(base_en, base_zh, sen, szh)
+            spec = dict(name=name, model=model, en=en, zh=zh, loot=("self",),
+                        tool="pickaxe", needs="iron" if is_deep else "stone",
+                        textures=[], textures_src=[], item=("parent", name), tags=[])
+            if has_parent:
+                spec["tex"] = {"parent": f"{base_name}_{_parent_of(suffix)}"}
+            if model == "slab":
+                spec["tex"] = {"parent": f"{base_name}_{_parent_of(suffix)}",
+                               "double": f"{base_name}_{_parent_of(suffix)}"}
+            if model == "wall":
+                spec["tags"] = ["walls"]
+                spec["item"] = ("parent", name + "_inventory")
+            if not has_parent:  # polished / bricks / cracked / chiseled -> 新贴图
+                src = {"polished": "block/polished_deepslate", "bricks": "block/deepslate_bricks",
+                       "cracked_bricks": "block/cracked_deepslate_bricks",
+                       "chiseled": "block/chiseled_deepslate"}[suffix]
+                spec["textures"] = [(name, src, profile)]
+                spec["tex"] = {"parent": name}
+            if model == "pillar":
+                spec["textures"] = [(f"{name}", "block/deepslate", profile),
+                                    (f"{name}_top", "block/deepslate_top", profile)]
+                spec["pillar_side"] = name
+                spec["pillar_top"] = f"{name}_top"
+            specs.append(spec)
+    return specs
+
+
+def _parent_of(suffix):
+    if suffix.startswith("polished"):
+        return "polished"
+    if suffix.startswith("brick") or suffix in ("bricks",):
+        return "bricks"
+    return suffix
+
+
+_WOOD_DERIVED = [
+    ("planks", "Planks", "木板", "cube_all"),
+    ("stairs", "Stairs", "楼梯", "stairs"),
+    ("slab", "Slab", "台阶", "slab"),
+    ("fence", "Fence", "栅栏", "fence"),
+    ("fence_gate", "Fence Gate", "栅栏门", "fence_gate"),
+    ("door", "Door", "门", "door"),
+    ("trapdoor", "Trapdoor", "活板门", "trapdoor"),
+    ("pressure_plate", "Pressure Plate", "压力板", "pressure_plate"),
+    ("button", "Button", "按钮", "button"),
+]
+
+
+def wood_specs(family):
+    specs = [dict(name=f"stripped_{family['prefix']}_wood", model="pillar",
+                  en=f"Stripped {family['en']} Wood", zh=f"去皮{family['zh']}",
+                  loot=("self",), tool="axe", needs=None, tags=["logs"],
+                  textures=[], tex={"parent": family["stripped_log"]},
+                  pillar_side=family["stripped_log"], pillar_top=family["stripped_log"])]
+    for suffix, sen, szh, model in _WOOD_DERIVED:
+        name = f"{family['prefix']}_{suffix}"
+        spec = dict(name=name, model=model, en=f"{family['en']} {sen}", zh=f"{family['zh']}{szh}",
+                    loot=("self",), tool="axe", needs=None, tags=[], tex={"parent": f"{family['prefix']}_planks"},
+                    textures=[], item=("parent", name))
+        if suffix == "planks":
+            spec["textures"] = [(name, family["planks_src"], family["profile"])]
+            spec["tex"] = {"parent": name}
+            spec["tags"] = ["planks"]
+        elif suffix == "stairs":
+            spec["tags"] = ["wooden_stairs"]
+        elif suffix == "slab":
+            spec["tags"] = ["wooden_slabs"]
+            spec["tex"] = {"parent": f"{family['prefix']}_planks", "double": f"{family['prefix']}_planks"}
+        elif suffix == "fence":
+            spec["tags"] = ["wooden_fences"]
+        elif suffix == "fence_gate":
+            spec["tags"] = ["fence_gates"]
+        elif suffix == "door":
+            spec["tags"] = ["wooden_doors"]
+            spec["item"] = ("generated", "weather_realm:item/" + name)
+            spec["item_textures"] = [(name, "item/oak_door", family["profile"])]
+        elif suffix == "trapdoor":
+            spec["tags"] = ["wooden_trapdoors"]
+            spec["item"] = ("parent", name + "_bottom")
+        elif suffix == "pressure_plate":
+            spec["tags"] = ["wooden_pressure_plates"]
+        elif suffix == "button":
+            spec["tags"] = ["wooden_buttons"]
+            spec["item"] = ("parent", name + "_inventory")
+        if model == "fence":
+            spec["item"] = ("parent", name + "_inventory")
+        if model == "wall":
+            spec["item"] = ("parent", name + "_inventory")
+        specs.append(spec)
+    return specs
+
+
+def all_building_block_ids():
+    ids = []
+    for fam in BUILDING_FAMILIES:
+        if fam.get("kind") == "stone":
+            ids += [s["name"] for s in stone_specs(fam)]
+        elif fam.get("kind") == "wood":
+            ids += [s["name"] for s in wood_specs(fam)]
+        elif fam.get("kind") == "lantern":
+            ids.append(fam["name"])
+        elif fam.get("kind") == "decoration":
+            ids += [f"{fam['prefix']}_{s}" for s in ("glass", "glass_pane", "grate", "chain")]
+    return ids
