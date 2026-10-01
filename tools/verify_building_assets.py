@@ -154,6 +154,73 @@ def tab_ids(root: Path) -> set:
     return ids
 
 
+# --- eco layer cover-noun: Java layerWord(...) <-> Python _ECO_BASES.word ---------------
+# The layer block id is ``<prefix>_<word>_layer``. The *word* half exists twice, hard-coded:
+#   * Java  : ``ModBuildingBlocks.layerWord(String prefix)`` (a switch expression), whose
+#             result feeds ``BLOCKS.register(prefix + "_" + word + "_layer", ...)``;
+#   * Python: the 5th field of every ``biome_data._ECO_BASES`` tuple, consumed by
+#             ``layer_specs()`` / ``all_building_block_ids()`` to name the generated
+#             resources.
+# A drift between the two silently produces "registered id != resource id" (e.g. Java
+# registers ``frost_snow_layer`` while Python generates ``frost_snowx_layer``); the static
+# checks cannot see the dynamic Java registration and the mismatch only surfaces at runtime
+# (creative tab ``orElseThrow``). The assertion below closes that hole.
+LAYER_WORD_METHOD_RE = re.compile(
+    r'private\s+static\s+String\s+layerWord\s*\([^)]*\)\s*\{(.*?)\n\s*\}', re.DOTALL)
+LAYER_WORD_CASE_RE = re.compile(r'case\s+"([a-z0-9_]+)"\s*->\s*"([a-z0-9_]+)"\s*;')
+LAYER_WORD_DEFAULT_RE = re.compile(r'default\s*->\s*"([a-z0-9_]+)"\s*;')
+
+
+def java_layer_word_map(root: Path) -> tuple:
+    """Parse ``ModBuildingBlocks.layerWord(...)`` -> ``(explicit_cases, default_word)``.
+
+    ``explicit_cases`` maps the literal theme prefix to its literal cover-noun; the
+    ``default`` arm (if present) is the fallback for any prefix not listed. A missing
+    method or 0 parsed ``case`` arms is a parse failure -- never a silent "0 differences".
+    """
+    text = _read(root / JAVA_REL / "ModBuildingBlocks.java")
+    match = LAYER_WORD_METHOD_RE.search(text)
+    if not match:
+        raise ParseError("ModBuildingBlocks.java 未找到 layerWord(...) 方法（结构变了？）")
+    body = match.group(1)
+    explicit = dict(LAYER_WORD_CASE_RE.findall(body))
+    default_match = LAYER_WORD_DEFAULT_RE.search(body)
+    default = default_match.group(1) if default_match else None
+    if not explicit:
+        raise ParseError("layerWord(...) 未解析出任何 case 映射（正则与代码不同步？）")
+    return explicit, default
+
+
+def layer_word_problems(root: Path) -> list:
+    """Java ``layerWord`` vs Python ``_ECO_BASES[..].word`` -- the mirror must not drift.
+
+    Every Python eco prefix must resolve in Java (explicit ``case`` or the ``default``
+    arm) to the same word; conversely every explicit Java ``case`` must correspond to a
+    Python eco prefix. Any difference is named per theme with both values shown.
+    """
+    explicit, default = java_layer_word_map(root)
+    py_map = {prefix: word for prefix, _zh, _en, _profile, word in bd._ECO_BASES}
+    problems: list = []
+    for prefix, py_word in sorted(py_map.items()):
+        if prefix in explicit:
+            java_word = explicit[prefix]
+        elif default is not None:
+            java_word = default
+        else:
+            problems.append(
+                f"{prefix}: Java layerWord(...) 无该前缀映射（case 与 default 都缺）")
+            continue
+        if java_word != py_word:
+            problems.append(f"{prefix}: Java={java_word!r} Python={py_word!r}")
+    for prefix in sorted(explicit):
+        if prefix not in py_map:
+            problems.append(
+                f"{prefix}: Java layerWord(...) 有映射，但 Python _ECO_BASES 无该生态前缀")
+    if not py_map:
+        problems.append("_ECO_BASES 无生态条目，无法比对 layerWord 映射（防假绿）")
+    return problems
+
+
 def lang_keys(root: Path, modid: str) -> dict:
     """{lang 文件名: 键集合}；必须含 en_us.json / zh_cn.json 且非空。"""
     lang_dir = root / ASSETS_REL / modid / "lang"
@@ -562,6 +629,7 @@ def main() -> None:
         java_ids, scanned = java_literal_ids(root)
         tabs = tab_ids(root)
         langs = lang_keys(root, modid)
+        layer_word_diffs = layer_word_problems(root)
     except (ParseError, json.JSONDecodeError, bd.FamilyDataError) as exc:
         print("BUILDING ASSETS FAILED: 解析错误", file=sys.stderr)
         print(f"  - {exc}", file=sys.stderr)
@@ -607,6 +675,8 @@ def main() -> None:
     print(f"[build] java ids     : {len(java_ids)} (from {', '.join(scanned)})")
     print(f"[build] tab ids      : {len(tabs)}")
     print(f"[build] lang files   : {', '.join(langs)}")
+    print(f"[build] layerWord map : {len(bd._ECO_BASES)} eco themes vs "
+          f"ModBuildingBlocks.layerWord ({len(layer_word_diffs)} diff)")
 
     problems = []
     if missing_java:
@@ -627,6 +697,8 @@ def main() -> None:
         problems.append(("门贴图错误", "door top/bottom texture not distinct/wrong", door_tex_problems))
     if missing_item_tex:
         problems.append(("物品贴图缺失", "missing textures/item png", missing_item_tex))
+    if layer_word_diffs:
+        problems.append(("生态映射漂移", "Java layerWord vs Python _ECO_BASES", layer_word_diffs))
 
     if problems:
         print("BUILDING ASSETS FAILED", file=sys.stderr)
