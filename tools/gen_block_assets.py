@@ -292,7 +292,7 @@ def write_block_client(root: Path, spec) -> None:
     for out_tex, src_tex, profile in spec.get("item_textures", []):
         recolor(read_png(ZIP, src_tex), profile).save(assets / "textures/item" / f"{out_tex}.png")
 
-    model = spec["model"]
+    model = spec.get("shape", spec["model"])
     if model == "pillar":
         side, top = spec["pillar_side"], spec["pillar_top"]
         write_json(assets / "models/block" / f"{name}.json", {
@@ -459,6 +459,59 @@ def write_block_client(root: Path, spec) -> None:
             ("minecraft:block/glass_pane_side", f"{MODID}:block/{name}_side"),
             ("minecraft:block/glass_pane_noside", f"{MODID}:block/{name}_noside"),
             ("minecraft:block/glass_pane_post", f"{MODID}:block/{name}_post")])
+    elif model == "cluster":
+        # Vanilla ``AmethystClusterBlock``: facing (6) x waterlogged (2) = 12 states.
+        texture = spec["textures"][0][0]
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/cross", "render_type": "minecraft:cutout",
+            "textures": {"cross": f"{MODID}:block/{texture}"}})
+        variants = {}
+        for facing, rotation in (("down", {"x": 180}), ("east", {"x": 90, "y": 90}),
+                                 ("north", {"x": 90}), ("south", {"x": 90, "y": 180}),
+                                 ("up", {}), ("west", {"x": 90, "y": 270})):
+            for waterlogged in (False, True):
+                variant = {"model": f"{MODID}:block/{name}"}
+                variant.update(rotation)
+                variants[f"facing={facing},waterlogged={str(waterlogged).lower()}"] = variant
+        write_json(assets / "blockstates" / f"{name}.json", {"variants": variants})
+    elif model == "layer":
+        # Vanilla ``SnowLayerBlock``: layers (1..8) x waterlogged (2) = 16 states.
+        for height in (2, 4, 6, 8, 10, 12, 14):
+            write_json(assets / "models/block" / f"{name}_height{height}.json", {
+                "parent": f"minecraft:block/snow_height{height}",
+                "textures": {"texture": _tx(spec, "all"), "particle": _tx(spec, "all")}})
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/cube_all", "textures": {"all": _tx(spec, "all")}})
+        layer_height = {1: "height2", 2: "height4", 3: "height6", 4: "height8",
+                        5: "height10", 6: "height12", 7: "height14"}
+        variants = {}
+        for layers in range(1, 9):
+            suffix = f"_{layer_height[layers]}" if layers in layer_height else ""
+            for waterlogged in (False, True):
+                variants[f"layers={layers},waterlogged={str(waterlogged).lower()}"] = {
+                    "model": f"{MODID}:block/{name}{suffix}"}
+        write_json(assets / "blockstates" / f"{name}.json", {"variants": variants})
+    elif model == "spike":
+        # Custom ``WeatherSpikeBlock``: thickness (4) x vertical_direction (2) x
+        # waterlogged (2) = 16 states; 4 segment models, ``down`` reuses them rotated.
+        for thickness in ("tip", "frustum", "middle", "base"):
+            write_json(assets / "models/block" / f"{name}_{thickness}.json", {
+                "parent": f"minecraft:block/pointed_dripstone_up_{thickness}",
+                "textures": {"cross": f"{MODID}:block/{name}_{thickness}"}})
+        # Canonical ``<name>.json`` (the widest segment): the base ``cross`` shape contract
+        # the resource verifier checks requires it, and the item model parents it.
+        write_json(assets / "models/block" / f"{name}.json", {
+            "parent": "minecraft:block/pointed_dripstone_up_base",
+            "textures": {"cross": f"{MODID}:block/{name}_base"}})
+        variants = {}
+        for thickness in ("tip", "frustum", "middle", "base"):
+            for direction, rotation in (("up", {}), ("down", {"x": 180})):
+                for waterlogged in (False, True):
+                    variant = {"model": f"{MODID}:block/{name}_{thickness}"}
+                    variant.update(rotation)
+                    variants[f"thickness={thickness},vertical_direction={direction},"
+                             f"waterlogged={str(waterlogged).lower()}"] = variant
+        write_json(assets / "blockstates" / f"{name}.json", {"variants": variants})
     else:
         raise ValueError(f"unknown model: {model}")
 
@@ -702,6 +755,9 @@ def collect_building_specs():
             pass  # expanded once below
     specs += bd.lantern_specs()
     specs += bd.decoration_specs()
+    specs += bd.cluster_specs()
+    specs += bd.layer_specs()
+    specs += bd.spike_specs()
     return specs
 
 

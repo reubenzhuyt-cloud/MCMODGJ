@@ -396,6 +396,15 @@ _DECORATION_BASES = [
     ("blaze", "燃焰", "Blaze", THEMES[0]["stone_profile"]),
     ("wind", "风沙", "Wind", THEMES[1]["stone_profile"]),
 ]
+# 生态美术小物 / eco decor (sub-project D): 3 themes x (cluster, layer, spike).
+# Cluster textures come from vanilla ``amethyst_cluster``, layers from ``snow`` and
+# spikes from the four ``pointed_dripstone_up_*`` segment sprites, all recoloured with
+# the theme's stone profile (design §7.7).
+_ECO_BASES = [
+    ("frost", "坚冰", "Frost", FROST_STONE_PROFILE, "snow"),
+    ("blaze", "燃焰", "Blaze", THEMES[0]["stone_profile"], "ash"),
+    ("wind", "风沙", "Wind", THEMES[1]["stone_profile"], "sand"),
+]
 
 # Phase B 为空；Phase C 用真实族填充。顺序：石（frost→fire→wind）→
 # 木（scorched→arid）→ 灯笼（frost→blaze→wind）→ 装饰（frost→blaze→wind）。
@@ -632,6 +641,68 @@ def decoration_specs():
     return specs
 
 
+# --- eco decor specs (sub-project D) ----------------------------------------
+# ``model`` is deliberately a shape the resource verifier already knows (the verifier's
+# ``_BLOCK_MODEL_SUFFIXES`` table is frozen): a cluster renders on ``minecraft:block/cross``
+# and a full layer is a ``cube_all``. ``shape`` drives the generator's dedicated
+# ``cluster`` / ``layer`` / ``spike`` branches, which differ from those base shapes only in
+# the blockstate variant set and the extra segment models.
+def cluster_specs():
+    """The 3 attachable crystal clusters (vanilla ``AmethystClusterBlock`` reuse).
+
+    Real blockstate: ``facing`` (6) x ``waterlogged`` (2) = 12 combinations. The generated
+    blockstate lists all 12 explicitly (design §6.2 / coordinator ruling).
+    """
+    specs = []
+    for prefix, zh, en, profile, _word in _ECO_BASES:
+        name = f"{prefix}_crystal_cluster"
+        specs.append(dict(name=name, model="cross", shape="cluster",
+                          en=f"{en} Crystal Cluster", zh=f"{zh}晶簇",
+                          loot=("self",), tool="pickaxe", needs=None, tags=[],
+                          textures=[(name, "block/amethyst_cluster", profile)], tex={"cross": name},
+                          item=("generated", f"{MODID}:block/{name}")))
+    return specs
+
+
+def layer_specs():
+    """The 3 layered covers (vanilla ``SnowLayerBlock`` reuse).
+
+    Real blockstate: ``layers`` (1..8) x ``waterlogged`` (2) = 16 combinations. The generated
+    blockstate lists all 16 explicitly (design §6.3 / coordinator ruling).
+    """
+    specs = []
+    for prefix, zh, en, profile, word in _ECO_BASES:
+        name = f"{prefix}_{word}_layer"
+        specs.append(dict(name=name, model="cube_all", shape="layer",
+                          en={"snow": "Frost Snow Layer", "ash": "Volcanic Ash Layer",
+                              "sand": "Wind Sand Layer"}[word],
+                          zh={"snow": f"{zh}雪层", "ash": f"{zh}灰烬层",
+                              "sand": f"{zh}沙层"}[word],
+                          loot=("self",), tool="shovel", needs=None, tags=[],
+                          textures=[(name, "block/snow", profile)], tex={"all": name},
+                          item=("generated", f"{MODID}:block/{name}")))
+    return specs
+
+
+def spike_specs():
+    """The 3 decorative spikes (custom ``WeatherSpikeBlock``).
+
+    Real blockstate: ``thickness`` (4) x ``vertical_direction`` (2) x ``waterlogged`` (2)
+    = 16 combinations. The generated blockstate lists all 16 explicitly, reusing 4
+    segment models x 2 direction rotations (design §6.4 / coordinator ruling).
+    """
+    specs = []
+    for prefix, zh, en, profile, _word in _ECO_BASES:
+        name = f"{prefix}_spike"
+        specs.append(dict(name=name, model="cross", shape="spike",
+                          en=f"{en} Spike", zh=f"{zh}尖锥",
+                          loot=("self",), tool="pickaxe", needs=None, tags=[],
+                          textures=[(f"{name}_{t}", f"block/pointed_dripstone_up_{t}", profile)
+                                    for t in ("tip", "frustum", "middle", "base")],
+                          item=("parent", f"{name}_base")))
+    return specs
+
+
 def glass_loot(block):
     """Vanilla glass semantics: only silk touch drops the block itself."""
     return {
@@ -669,6 +740,9 @@ def all_building_specs():
             pass  # expanded once via decoration_specs(), not per family
     specs += lantern_specs()
     specs += decoration_specs()
+    specs += cluster_specs()
+    specs += layer_specs()
+    specs += spike_specs()
     return specs
 
 
@@ -684,6 +758,9 @@ def all_building_block_ids():
             ids.append(fam["name"])
         elif kind == "decoration":
             ids += [f"{fam['prefix']}_{s}" for s in ("glass", "glass_pane", "grate", "chain")]
+    ids += [s["name"] for s in cluster_specs()]
+    ids += [s["name"] for s in layer_specs()]
+    ids += [s["name"] for s in spike_specs()]
     return ids
 
 
