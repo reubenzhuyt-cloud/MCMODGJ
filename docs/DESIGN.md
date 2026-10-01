@@ -215,9 +215,9 @@
 | 交互 | 核心 + 下方基座 → 客户端打开「天象调控仪」 | `client/WeatherAltarInteractionHandler.java` |
 | 战利品 | 雕像内宝箱必得《古代天气研究手记》 | `data/weather_realm/loot_table/chests/weather_altar.json` |
 | 结构模板 | `weather_altar.nbt` 内含核心 / 基座 / 手记箱 | 已解压 NBT 校验，字符串含 `weather_altar_core` / `weather_pedestal` / `ancient_weather_tome` |
-| **自然生成** | 🟡 存在 `worldgen/structure/weather_altar.json` 与 `template_pool/weather_altar.json`，但**没有对应的 `structure_set`**，`village/altar_pool.json` 亦无任何池引用它 | `data/weather_realm/worldgen/structure_set/` 仅含 4 个文件，无 `weather_altar` |
+| **自然生成** | ✅ 随 **5 种原版村庄**（平原 / 雪原 / 沙漠 / 热带草原 / 针叶林）注入：覆盖 `village_{plains,snowy,desert,savanna,taiga}` 结构（仅改 `start_pool`）→ 锚点 `start.nbt` 内 `target=minecraft:building_entrance`、`pool=weather_realm:village/altar_pool` 的 jigsaw → `village/altar_pool` → `weather_altar.nbt` | `data/minecraft/worldgen/structure/village_*.json`、`data/weather_realm/structure/village/*/start.nbt`、`worldgen/template_pool/village/altar_pool.json`；门禁 `tools/verify_village_altar.py` |
 
-> 现状：祭坛**只能**通过 `/place structure weather_realm:weather_altar` 或创造模式搭建复现，村庄里不会自然出现。旧 GDD 声称「生成于平原/雪原村庄」**不成立**。修复见 §9 路线图。
+> 现状：祭坛会**随 5 种原版村庄自然生成**（僵尸村庄复用同一批村庄结构，经 `zombie` 变体处理，无需额外注入）。注意结构**不回填已生成区块**，旧存档中看不到祭坛属正常。门禁见 `tools/verify_village_altar.py`。
 
 ### 6.2 《古代天气研究手记》与 Patchouli ✅
 
@@ -290,8 +290,8 @@
 | `weather_realm:shelter` | 避难所 | `crystal_plains` | ✅ 外壳 + 专属战利品 |
 | `weather_realm:yanjiang` | 熔岩遗迹 | `crystal_plains` | ✅ 外壳（无专属战利品） |
 | `weather_realm:fire` | 烈火祭坛 | `crystal_plains` | ✅ 外壳（无专属战利品） |
-| `weather_realm:weather_altar` | 村庄气象祭坛 | 设计为平原/雪原村庄 | 🟡 缺 `structure_set`，不自然生成 |
-| 原版村庄覆盖 | `village_plains` / `village_snowy` 起始池改为模组坚冰木村庄 | 主世界 | ✅ `data/minecraft/worldgen/structure/village_*.json` |
+| `weather_realm:weather_altar` | 村庄气象祭坛 | 平原 / 雪原 / 沙漠 / 热带草原 / 针叶林 5 种原版村庄 | ✅ 经村庄锚点 `building_entrance` jigsaw 注入 |
+| 原版村庄覆盖 | `village_plains` / `village_snowy` / `village_desert` / `village_savanna` / `village_taiga` 起始池改为模组锚点（内含祭坛注入） | 主世界 | ✅ `data/minecraft/worldgen/structure/village_*.json` |
 
 - 三座异界地表结构均为 `size=1`、`WORLD_SURFACE_WG`、`beard_thin`；战利品表见 `loot_table/chests/{shelter,weather_altar}.json`。
 - 旧 GDD 的 `frost_observatory`（极寒气象观测所）多房间 Jigsaw 地牢 ⬜，当前**没有**对应实现。
@@ -405,7 +405,7 @@
 | 进入维度 | 祭坛重构仪式 + 裂隙方块 | **投掷 `climate_shard` 点燃 2×2 水池 + 12 格框架** |
 | 祭坛 UI | 未提 | **天象调控仪**（晴/雨/雷三态，`weather_altar_core` + `weather_pedestal`） |
 | 手记物品 ID | `ancient_weather_notes` | **`ancient_weather_tome`**（书 `weather_tome`） |
-| 祭坛生成 | 声称生成于平原/雪原村庄 | 🟡 **缺 `structure_set`，当前不自然生成** |
+| 祭坛生成 | 生成于平原/雪原/沙漠/热带草原/针叶林 5 种原版村庄 | ✅ 经村庄 `start.nbt` 的 `building_entrance` jigsaw 注入（门禁 `verify_village_altar.py`） |
 | 地图 | 未在正文实现层出现 | **极域天象图 `biome_map`**（手持地图） |
 | 失温 / 风暴 / 地牢 / Boss / 神器 | 作为「已定稿实现规范」 | **全部 ⬜ 未实现**，仅属愿景 |
 
@@ -415,8 +415,7 @@
 
 **仍需复核：**
 
-1. **`weather_altar` 是否真的不生成**：依据是「无 `structure_set` + `village/altar_pool.json` 无引用链」。已复核 `worldgen/structure_set/` 仅含 `crystal_village`/`fire`/`shelter`/`yanjiang` 四个文件，结论成立；若后续补资源需修正。
-2. **`mod_group_id` 仍为 `com.example.examplemod`**（`gradle.properties:39`），而源码包名为 `com.example.weather_realm`；是否属有意遗留待团队确认（当前不影响本地运行）。
+1. **`mod_group_id` 仍为 `com.example.examplemod`**（`gradle.properties:39`），而源码包名为 `com.example.weather_realm`；是否属有意遗留待团队确认（当前不影响本地运行）。
 
 **已复核（本轮据代码确认，从原「不确定」移出）：**
 
@@ -424,6 +423,7 @@
 4. ~~**极域天象图探索进度是否持久化**~~：**已作废**。探索/迷雾机制整体移除（`BiomeMapExplorationState` 已删除），地图改为**服务端噪声采样、范围内全图即时染色**，不再有「探索进度」概念；证据 `map/BiomeMapServerSampler.java`、`client/map/BiomeMapClientData.java:100-115`。
 5. **`weather_altar_core` 的 BER 双层模型是否启用**：✅ 已确认启用。`client/ClientBlockEntityRenderers.java:22` 注册 BER，`:26-28` 通过 `ModelEvent.RegisterAdditional` 加载 shell/inner 两个独立模型。
 6. **模板残留 `Config.java`**：✅ 已删除，替换为 `config/WeatherRealmConfig.java`；其 COMMON/CLIENT 项分别被 `ModNetwork`、`WeatherPortalBlock`、`ClimatePortalHandler` 与 `ClientBlizzardEffects` 读取。
+7. **`weather_altar` 是否自然生成**：✅ **已更正——会生成**。此前误判为「无 `structure_set`，不自然生成」，实际漏看了村庄锚点 `start.nbt` 内的 `building_entrance` jigsaw：本 mod 覆盖 `village_{plains,snowy,desert,savanna,taiga}` 五个结构（仅改 `start_pool`），其锚点注入 `weather_realm:village/altar_pool` → `weather_altar.nbt`，故祭坛随全部 5 种原版村庄生成（僵尸村庄复用同一批结构）。门禁 `tools/verify_village_altar.py`。
 
 ---
 

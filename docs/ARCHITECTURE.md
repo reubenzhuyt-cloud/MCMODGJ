@@ -424,6 +424,8 @@ lang 亦为 dict.update merge（`:663-667`），不覆盖手写键。
 | `python tools\verify_tab_coverage.py` | 创造页覆盖率校验（本次新增） | 每个已注册 item 恰好收录一次；exit 0 |
 | `python tools\verify_building_assets.py` | 建材双向校验（本次新增） | 数据表 ↔ Java ↔ 资源 ↔ lang/标签；exit 0 |
 | `python tools\verify_ore_textures.py` | 矿石贴图校验（既有） | 复合矿石背景与岩石逐像素一致；exit 0 |
+| `python tools\verify_village_altar.py` | 村庄祭坛注入链静态门禁（本次新增） | 5 种村庄覆盖、锚点 NBT、模板池、群系 BGM 登记；exit 0 |
+| `python tools\make_village_start_nbt.py` | 生成/检查各村庄 `start.nbt` 锚点（本次新增） | 从 plains 模板派生 desert/savanna/taiga；确定性 gzip |
 | `.\deploy.ps1` / `.\deploy.bat` | 一键构建 + 注入 PCL mods | 见下 |
 
 ### 8.1 `deploy.ps1` 工作流（当前实现）
@@ -438,17 +440,19 @@ lang 亦为 dict.update merge（`:663-667`），不覆盖手写键。
 
 ### 8.2 静态校验脚本（本次新增）
 
-本仓库**无测试基建**（`src/test/java` 不存在）且团队禁用 `runClient`/`runServer`/`runGameTestServer`，因此自动化门禁以 Python 静态脚本为主（仅生成贴图配色校验需要 Pillow，与 `gen_block_assets` 依赖一致）；三者必须全部 `exit 0`，任一非零即视为门禁失败。
+本仓库**无测试基建**（`src/test/java` 不存在）且团队禁用 `runClient`/`runServer`/`runGameTestServer`，因此自动化门禁以 Python 静态脚本为主（仅生成贴图配色校验需要 Pillow，与 `gen_block_assets` 依赖一致）；四者必须全部 `exit 0`，任一非零即视为门禁失败。
 
 | 脚本 | 断言什么 | 怎么失败 |
 | :- | :- | :- |
 | `tools/verify_tab_coverage.py` | 已注册 item 集合（`ModItems.java` 字面注册 + `ModBlocks` 矿石模板 + `biome_data.all_building_block_ids()`）与 `ModCreativeTabs` 的 `TabCategory` id 表**双向相等**、无重复；恰好 **2 个**页签；每个页签标题键（`itemGroup.*`）在每个 `lang/*.json` 存在 | 缺失/重复/多余 id、页签数 ≠ 2、lang 键缺失；**解析到 0 个 id 直接判失败**（防正则失效后假绿） |
 | `tools/verify_building_assets.py` | `biome_data` 数据表 ↔ `ModBlocks`/`ModItems`/`ModBuildingBlocks`/`ModCreativeTabs` 字面 id ↔ 生成资源（blockstates / 方块与物品模型 / **精确**逐形状文件名 / 掉落表 / 物品贴图）↔ 中英 lang 键；按 spec 的 `tool`/`needs`/`tags` 断言原版标签成员；另有**手写标签保留基线**，防止再生把既有手写 id 冲掉；以及 Java `ModBuildingBlocks.layerWord()` ↔ Python `_ECO_BASES.word` 的**跨语言生态映射一致性**断言（防注册 id ≠ 资源 id）；**石材派生件配色**断言（逐主题逐派生贴图不透明像素均值 HSV 必须贴近其基材贴图，dH≤0.04 / dS≤0.08 / dV≤0.12，带 1e-6 浮点边界容差，摘要打印实际比较张数，任一主题/深浅分组比较数为 0 即失败）；**图案不塌陷**断言（每张派生贴图不透明像素明度标准差 ≥ 0.05 且唯一颜色数 ≥ 4）；**blockstate 属性白名单**断言（每个形状的 variants/multipart 只许用白名单属性键，`layer` 仅 `layers`，可抓非法 `waterlogged`） | 任一方向差异、模型文件缺失（按精确 stem，不把 `<name>_stairs` 当 `<name>` 蒙混）、门上下贴图未区分、手写标签被删、生态映射漂移（逐主题点名 Java/Python 两侧值）、石材配色超差（逐条点名贴图/基材/实际 dH/dS/dV）、石材图案塌陷（点名贴图 + sigma/唯一色数）、blockstate 变体引用白名单外属性（点名文件 + 属性名）、数据表出现后缀表 `_BLOCK_MODEL_SUFFIXES` 外的**未知形状**（点名 id + 形状并提示补后缀表）；解析到 0 个 id、0 条 `layerWord` 映射、0 个 blockstate、0 组石材派生贴图、某主题/深浅分组 0 张派生贴图或命名模式自检失败即失败 |
 | `tools/verify_ore_textures.py` | 复合矿石贴图的**非矿物像素**与其岩石贴图逐像素一致；矿物掩码取自原版矿石 × 原版岩石（stone/deepslate）调色板 | 尺寸/alpha 异常，或背景像素与岩石不一致 |
+| `tools/verify_village_altar.py`（本次新增） | 「原版村庄覆盖 → `weather_realm:village/<type>/start` 模板池 → `start.nbt` 锚点 → `building_entrance` jigsaw → `village/altar_pool` → `weather_altar.nbt`」整条链真实解析：① `village_{plains,snowy,desert,savanna,taiga}` 五个覆盖均存在，且与原版 jar 原文**逐字段比对**差异**仅限 `start_pool`**；② 每个 `start_pool` 指向的模板池文件存在；③ 该池锚点 NBT 存在且同时含 `target=minecraft:building_entrance`/`pool=weather_realm:village/altar_pool` 与 `pool=minecraft:village/<type>/town_centers` 两个 jigsaw；④ `village/altar_pool` 存在且其 `weather_altar.nbt` 存在；⑤ 上述 NBT 中**每一个** jigsaw `pool` 都能解析到`weather_realm:`（查仓库）或 `minecraft:`（查 vanilla jar）的真实模板池，未解析到者**点名**；⑥ 三个 mod 群系 `effects.music.sound` 已在 `assets/weather_realm/sounds.json` 登记 | 覆盖缺失/字段越界（点名文件+字段+两侧值）、模板池或 NBT 缺失、jigsaw 缺失（点名 target/pool）、pool 无法解析（点名 pool+来源文件）、群系音乐未登记（点名群系+sound id）；**解析到 0 个村庄结构或 0 个 NBT 直接失败** |
+| `tools/make_village_start_nbt.py`（本次新增） | 用自带的**无依赖 NBT 读写器**（标准库 `gzip`/`struct`）从现有 `village/plains/start.nbt` 派生 desert/savanna/taiga 锚点：**只重写**「接回原版村庄」那个 jigsaw 的 `pool`（`minecraft:village/<type>/town_centers`），`building_entrance` jigsaw 原样保留；gzip 固定 `mtime=0` 保证**逐字节可复现**；附 `--inspect`（打印每个 jigsaw 的 name/target/pool）与 `--diff` | 模板 jigsaw 数 ≠ 2、找不到唯一的 reconnect/altar jigsaw、NBT 解析异常即非零退出 |
 
 ### 8.3 本次工程收尾工作流
 
-每阶段收尾 = **`.\gradlew.bat build` 通过 → `verify_tab_coverage.py` / `verify_building_assets.py` / `verify_ore_textures.py` 三个脚本全部 `exit 0` → `.\deploy.ps1` 部署**（部署前完全退出客户端，见 §8.1 与 `AGENTS.md` §8.1）。本次四个阶段均据此收尾，最终产物 jar 2,171,712 B。
+每阶段收尾 = **`.\gradlew.bat build` 通过 → `verify_tab_coverage.py` / `verify_building_assets.py` / `verify_ore_textures.py` / `verify_village_altar.py` 四个脚本全部 `exit 0` → `.\deploy.ps1` 部署**（部署前完全退出客户端，见 §8.1 与 `AGENTS.md` §8.1）。本次四个阶段均据此收尾，最终产物 jar 2,171,712 B。
 
 ---
 
@@ -509,7 +513,7 @@ lang 亦为 dict.update merge（`:663-667`），不覆盖手写键。
 
 1. **未执行 `./gradlew build` / `runClient` / `runServer` / `runGameTestServer`**：本文件全部结论来自静态代码与资源核对，未经运行验证。
 2. **`src/test/java` 不存在**：`TEST_COMMANDS.md` 与 `AGENTS.md` §9 提到的 JUnit 边界目前无实际用例；`runGameTestServer` 是否有非空用例集未核实。
-3. **`weather_altar` 自然生成**：`worldgen/structure/weather_altar.json` 存在，但 `worldgen/structure_set/` 只有 `crystal_village`/`fire`/`shelter`/`yanjiang` 四个文件，**无 `weather_altar`**，故当前**不会自然生成**（与 `docs/DESIGN.md` 一致）。
+3. **`weather_altar` 自然生成**：~~`worldgen/structure/weather_altar.json` 存在，但 `worldgen/structure_set/` 只有 `crystal_village`/`fire`/`shelter`/`yanjiang` 四个文件，无 `weather_altar`，故当前不会自然生成~~ **已更正**：祭坛**确实会随村庄自然生成**——本 mod 覆盖了全部 **5 种**原版村庄结构（`village_plains` / `village_snowy` / `village_desert` / `village_savanna` / `village_taiga`，见 `data/minecraft/worldgen/structure/village_*.json`，仅 `start_pool` 改为 `weather_realm:village/<type>/start`），其锚点 `start.nbt` 内含 `target=minecraft:building_entrance` / `pool=weather_realm:village/altar_pool` 的 jigsaw，经 `village/altar_pool` 引用 `weather_altar.nbt` 注入村庄。僵尸村庄复用同一批村庄结构（通过 `zombie` 变体），无需额外注入。注意结构不会回填已生成区块，旧存档看不到祭坛属正常。门禁见 `tools/verify_village_altar.py`。
 4. **`src/generated/resources/` 目前无文件**：`runData` 尚无 DataGen provider，产物清单未验证。
 5. **`gradle.properties:39` 的 `mod_group_id=com.example.examplemod`** 与源码包名 `com.example.weather_realm` 不一致；未确认是否影响发布（当前不影响本地运行）。
 6. **`features` 第 6 段（索引 6）与第 10 段（索引 10）的语义**：本工程按 vanilla 阶段顺序填写（索引 6 放矿脉、索引 10 放 `freeze_top_layer`），已通过 JSON 计数确认段数，但未运行时验证世界实际生成结果。
