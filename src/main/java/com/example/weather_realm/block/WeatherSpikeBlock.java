@@ -42,9 +42,27 @@ public class WeatherSpikeBlock extends Block implements SimpleWaterloggedBlock {
     public static final DirectionProperty VERTICAL_DIRECTION = BlockStateProperties.VERTICAL_DIRECTION;
     public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
 
-    /** 逐段收窄的碰撞箱，索引与 {@link SpikeThickness} 的 ordinal 一一对应。 */
-    private static final VoxelShape[] SHAPES = new VoxelShape[]{
-            Block.box(6.0D, 0.0D, 6.0D, 10.0D, 16.0D, 10.0D),   // TIP
+    /**
+     * 逐段收窄的碰撞箱，索引与 {@link SpikeThickness} 的 ordinal 一一对应。
+     *
+     * <p>朝上（{@link Direction#UP}）时 {@code tip} 只占据方块底部（y 0..11），把顶部的
+     * 尖端留空；朝下（{@link Direction#DOWN}）时整体沿 Y 轴镜像，{@code tip} 改占顶部
+     * （y 5..16），把底部的尖端留空。{@code frustum}/{@code middle}/{@code base} 三段
+     * 是贯穿整格（y 0..16）的立柱，关于 y=8 对称，因此其 Y 轴镜像即自身——这与原版
+     * {@code PointedDripstoneBlock} 只区分 {@code TIP_SHAPE_UP}/{@code TIP_SHAPE_DOWN}
+     * 的做法一致，也是「逐段收窄、无空隙」所要求的（任一段若只占部分高度，堆叠时就会
+     * 在相邻两格之间产生空隙）。</p>
+     */
+    private static final VoxelShape[] SHAPES_UP = new VoxelShape[]{
+            Block.box(6.0D, 0.0D, 6.0D, 10.0D, 11.0D, 10.0D),   // TIP
+            Block.box(5.0D, 0.0D, 5.0D, 11.0D, 16.0D, 11.0D),   // FRUSTUM
+            Block.box(4.0D, 0.0D, 4.0D, 12.0D, 16.0D, 12.0D),   // MIDDLE
+            Block.box(3.0D, 0.0D, 3.0D, 13.0D, 16.0D, 13.0D),   // BASE
+    };
+
+    /** {@link #SHAPES_UP} 沿 Y 轴镜像（y -> 16 - y）后的结果，供 {@link Direction#DOWN} 使用。 */
+    private static final VoxelShape[] SHAPES_DOWN = new VoxelShape[]{
+            Block.box(6.0D, 5.0D, 6.0D, 10.0D, 16.0D, 10.0D),   // TIP
             Block.box(5.0D, 0.0D, 5.0D, 11.0D, 16.0D, 11.0D),   // FRUSTUM
             Block.box(4.0D, 0.0D, 4.0D, 12.0D, 16.0D, 12.0D),   // MIDDLE
             Block.box(3.0D, 0.0D, 3.0D, 13.0D, 16.0D, 13.0D),   // BASE
@@ -88,7 +106,9 @@ public class WeatherSpikeBlock extends Block implements SimpleWaterloggedBlock {
 
     @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return SHAPES[state.getValue(THICKNESS).ordinal()];
+        VoxelShape[] shapes = state.getValue(VERTICAL_DIRECTION) == Direction.DOWN
+                ? SHAPES_DOWN : SHAPES_UP;
+        return shapes[state.getValue(THICKNESS).ordinal()];
     }
 
     @Override
