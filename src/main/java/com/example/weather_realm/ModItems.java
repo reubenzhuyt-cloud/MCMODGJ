@@ -1,5 +1,6 @@
 package com.example.weather_realm;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -28,9 +29,11 @@ import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Tier;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.block.Block;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.DeferredSpawnEggItem;
 import net.neoforged.neoforge.common.SimpleTier;
+import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -242,6 +245,68 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> DUNE_FLOWER_ITEM = ITEMS.registerSimpleBlockItem("dune_flower", ModBlocks.DUNE_FLOWER);
     public static final DeferredItem<BlockItem> WIND_SPROUT_ITEM = ITEMS.registerSimpleBlockItem("wind_sprout", ModBlocks.WIND_SPROUT);
     public static final DeferredItem<BlockItem> ARID_BUSH_ITEM = ITEMS.registerSimpleBlockItem("arid_bush", ModBlocks.ARID_BUSH);
+
+    // ============================================================================================
+    // 建筑方块 BlockItem 批量注册 / Building-block items (design §8.2)
+    // ============================================================================================
+    public static final List<DeferredItem<BlockItem>> BUILDING_BLOCK_ITEMS = new ArrayList<>();
+
+    private static DeferredItem<BlockItem> buildingItem(String name, DeferredBlock<? extends Block> block) {
+        DeferredItem<BlockItem> item = ITEMS.registerSimpleBlockItem(name, block);
+        BUILDING_BLOCK_ITEMS.add(item);
+        return item;
+    }
+
+    private static DeferredItem<BlockItem> buildingDoorItem(String name, DeferredBlock<? extends Block> block) {
+        DeferredItem<BlockItem> item = ITEMS.register(name,
+                () -> new DoubleHighBlockItem(block.get(), new Item.Properties()));
+        BUILDING_BLOCK_ITEMS.add(item);
+        return item;
+    }
+
+    static {
+        for (ModBuildingBlocks.StoneFamily family : ModBuildingBlocks.STONE_FAMILIES) {
+            for (ModBuildingBlocks.StoneLayer layer : new ModBuildingBlocks.StoneLayer[]{family.shallow(), family.deep()}) {
+                buildingItem(layer.name() + "_polished", layer.polished());
+                buildingItem(layer.name() + "_polished_stairs", layer.polishedStairs());
+                buildingItem(layer.name() + "_polished_slab", layer.polishedSlab());
+                buildingItem(layer.name() + "_polished_wall", layer.polishedWall());
+                buildingItem(layer.name() + "_bricks", layer.bricks());
+                buildingItem(layer.name() + "_brick_stairs", layer.brickStairs());
+                buildingItem(layer.name() + "_brick_slab", layer.brickSlab());
+                buildingItem(layer.name() + "_brick_wall", layer.brickWall());
+                if (layer.crackedBricks() != null) {
+                    buildingItem(layer.name() + "_cracked_bricks", layer.crackedBricks());
+                }
+                buildingItem(layer.name() + "_chiseled", layer.chiseled());
+                if (layer.pillar() != null) {
+                    buildingItem(layer.name() + "_pillar", layer.pillar());
+                }
+            }
+        }
+        for (ModBuildingBlocks.WoodFamily family : ModBuildingBlocks.WOOD_FAMILIES) {
+            String p = family.prefix();
+            buildingItem("stripped_" + p + "_wood", family.strippedWood());
+            buildingItem(p + "_planks", family.planks());
+            buildingItem(p + "_stairs", family.stairs());
+            buildingItem(p + "_slab", family.slab());
+            buildingItem(p + "_fence", family.fence());
+            buildingItem(p + "_fence_gate", family.fenceGate());
+            buildingDoorItem(p + "_door", family.door());
+            buildingItem(p + "_trapdoor", family.trapdoor());
+            buildingItem(p + "_pressure_plate", family.pressurePlate());
+            buildingItem(p + "_button", family.button());
+        }
+        for (ModBuildingBlocks.LanternSet set : ModBuildingBlocks.LANTERNS) {
+            buildingItem(set.prefix() + "_lantern", set.lantern());
+        }
+        for (ModBuildingBlocks.DecorationSet set : ModBuildingBlocks.DECORATIONS) {
+            buildingItem(set.prefix() + "_glass", set.glass());
+            buildingItem(set.prefix() + "_glass_pane", set.glassPane());
+            buildingItem(set.prefix() + "_grate", set.grate());
+            buildingItem(set.prefix() + "_chain", set.chain());
+        }
+    }
 
     public static void register(IEventBus bus) {
         ITEMS.register(bus);
