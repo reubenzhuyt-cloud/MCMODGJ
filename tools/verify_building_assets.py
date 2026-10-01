@@ -183,6 +183,13 @@ def _rel(root: Path, path: Path) -> str:
 # These are *exact* stems, not prefix globs: a missing base model must never be masked by
 # a collapsed sibling such as ``<name>_stairs.json``. The derived shapes ``_inner`` /
 # ``_top`` / ``_side`` / ... are still required, list by list.
+#
+# The key is the **real** shape the generator branches on (``gen_block_assets`` does
+# ``model = spec.get("shape", spec["model"])``), not the base parent a spec reuses:
+# an eco cluster renders through ``minecraft:block/cross`` but its emitted branch is
+# ``cluster``, and a layer's ``_height*`` segments / a spike's ``_tip`` / ``_frustum``
+# / ``_middle`` / ``_base`` segments are only produced by those dedicated branches.
+# Dispatching on the raw ``model`` here would leave every derived eco model unverified.
 _BLOCK_MODEL_SUFFIXES = {
     "cross": ("",),
     "leaves": ("",),
@@ -202,7 +209,17 @@ _BLOCK_MODEL_SUFFIXES = {
     "pressure_plate": ("", "_down"),
     "lantern": ("", "_hanging"),
     "pane": ("_post", "_side", "_side_alt", "_noside", "_noside_alt"),
+    # Eco decor dedicated branches (sub-project D): the derived segment models live here.
+    "cluster": ("",),
+    "layer": ("", "_height2", "_height4", "_height6", "_height8",
+              "_height10", "_height12", "_height14"),
+    "spike": ("", "_tip", "_frustum", "_middle", "_base"),
 }
+
+
+def real_shape(spec) -> str:
+    """The branch ``write_block_client`` actually dispatches on for this spec."""
+    return spec.get("shape", spec.get("model"))
 
 
 def block_model_problems(root: Path, specs, modid: str) -> list:
@@ -211,7 +228,7 @@ def block_model_problems(root: Path, specs, modid: str) -> list:
     block_dir_rel = ASSETS_REL / modid / "models/block"
     for spec in specs:
         name = spec["name"]
-        model = spec.get("model")
+        model = real_shape(spec)
         suffixes = _BLOCK_MODEL_SUFFIXES.get(model)
         if suffixes is None:
             problems.append(f"{name}: unknown model shape {model!r} (verifier out of sync)")
