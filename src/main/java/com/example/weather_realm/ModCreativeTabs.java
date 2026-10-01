@@ -16,7 +16,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 /**
  * 创造模式标签页注册 / Creative mode tab registration.
  *
- * <p>Two tabs replace the former single {@code weather_realm_tab}: a building-blocks page
+ * <p>Two tabs replace the previous single tab: a building-blocks page
  * ({@code building_blocks}) and an items page ({@code items}, keeping the original
  * {@code itemGroup.weather_realm} translation key). Each page is ordered by a pure-data
  * {@link TabCategory} table whose {@code itemIds} are namespace-less item ids; the verifier
@@ -130,8 +130,10 @@ public final class ModCreativeTabs {
     private static void acceptCategories(CreativeModeTab.Output output, List<TabCategory> categories) {
         for (TabCategory category : categories) {
             for (String id : category.itemIds()) {
-                output.accept(BuiltInRegistries.ITEM.get(
-                        ResourceLocation.fromNamespaceAndPath(WeatherRealm.MODID, id)));
+                output.accept(BuiltInRegistries.ITEM
+                        .getOptional(ResourceLocation.fromNamespaceAndPath(WeatherRealm.MODID, id))
+                        .orElseThrow(() -> new IllegalStateException(
+                                "ModCreativeTabs: unknown item id '" + id + "'")));
             }
         }
     }

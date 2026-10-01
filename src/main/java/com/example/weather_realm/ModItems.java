@@ -1,6 +1,5 @@
 package com.example.weather_realm;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -216,13 +215,11 @@ public final class ModItems {
     public static final DeferredItem<Item> WIND_CRYSTAL = ITEMS.registerSimpleItem("wind_crystal");
     public static final DeferredItem<BlockItem> WIND_CRYSTAL_BLOCK_ITEM = ITEMS.registerSimpleBlockItem("wind_crystal_block", ModBlocks.WIND_CRYSTAL_BLOCK);
 
-    // 矿石 BlockItem 批量注册 / Generated ore family items, collected for the creative tab.
-    // Package-private so {@link ModCreativeTabs} can append them, mirroring the former main-class list.
-    static final List<DeferredItem<BlockItem>> GENERATED_ORE_ITEMS = new ArrayList<>();
-
+    // 矿石 BlockItem 批量注册 / Generated ore family items. Driven by {@link ModBlocks#GENERATED_ORES};
+    // creative-page grouping is maintained as literal ids in {@link ModCreativeTabs}, not collected here.
     static {
         for (ModBlocks.OreBlock ore : ModBlocks.GENERATED_ORES) {
-            GENERATED_ORE_ITEMS.add(ITEMS.registerSimpleBlockItem(ore.name(), ore.block()));
+            ITEMS.registerSimpleBlockItem(ore.name(), ore.block());
         }
     }
 
