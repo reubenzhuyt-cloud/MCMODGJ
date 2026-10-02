@@ -3,6 +3,8 @@ package com.example.weather_realm;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.example.weather_realm.block.AridLogBlock;
+import com.example.weather_realm.block.AridPlanksBlock;
 import com.example.weather_realm.block.FrostLogBlock;
 import com.example.weather_realm.block.WeatherSpikeBlock;
 
@@ -65,7 +67,8 @@ public final class ModBuildingBlocks {
     }
 
     public record WoodFamily(String prefix, String themeKey, BlockSetType setType, WoodType woodType,
-                             DeferredBlock<FrostLogBlock> strippedWood, DeferredBlock<Block> planks,
+                             DeferredBlock<? extends RotatedPillarBlock> strippedWood,
+                             DeferredBlock<? extends Block> planks,
                              DeferredBlock<StairBlock> stairs, DeferredBlock<SlabBlock> slab,
                              DeferredBlock<FenceBlock> fence, DeferredBlock<FenceGateBlock> fenceGate,
                              DeferredBlock<DoorBlock> door, DeferredBlock<TrapDoorBlock> trapdoor,
@@ -115,16 +118,23 @@ public final class ModBuildingBlocks {
     }
 
     private static WoodFamily woodFamily(String prefix, String themeKey, BlockSetType setType, WoodType woodType,
-                                         MapColor mapColor) {
-        DeferredBlock<FrostLogBlock> strippedWood = BLOCKS.registerBlock("stripped_" + prefix + "_wood",
-                FrostLogBlock::new, ModBlockProperties.woodPillar(mapColor));
-        DeferredBlock<Block> planks = BLOCKS.registerSimpleBlock(prefix + "_planks",
-                BlockBehaviour.Properties.of()
-                        .mapColor(mapColor)
-                        .instrument(NoteBlockInstrument.BASS)
-                        .strength(2.0F, 3.0F)
-                        .sound(SoundType.WOOD)
-                        .ignitedByLava());
+                                         MapColor mapColor, boolean weathered) {
+        // Only the weathered (arid) family carries alpha=0 erosion holes: its cube blocks must not
+        // occlude neighbours (see AridLogBlock / AridPlanksBlock, which also restore light blocking)
+        // and its models are cutout. The fire/scorched family stays an opaque, occlusion-culling
+        // family with its pre-existing properties untouched.
+        DeferredBlock<? extends RotatedPillarBlock> strippedWood;
+        DeferredBlock<? extends Block> planks;
+        if (weathered) {
+            strippedWood = BLOCKS.registerBlock("stripped_" + prefix + "_wood",
+                    AridLogBlock::new, ModBlockProperties.aridWoodPillar());
+            planks = BLOCKS.registerBlock(prefix + "_planks",
+                    AridPlanksBlock::new, ModBlockProperties.aridPlanks());
+        } else {
+            strippedWood = BLOCKS.registerBlock("stripped_" + prefix + "_wood",
+                    FrostLogBlock::new, ModBlockProperties.woodPillar(mapColor));
+            planks = BLOCKS.registerSimpleBlock(prefix + "_planks", ModBlockProperties.woodPlanks(mapColor));
+        }
         DeferredBlock<StairBlock> stairs = BLOCKS.register(prefix + "_stairs",
                 () -> new StairBlock(planks.get().defaultBlockState(), BlockBehaviour.Properties.ofFullCopy(planks.get())));
         DeferredBlock<SlabBlock> slab = BLOCKS.register(prefix + "_slab",
@@ -236,8 +246,8 @@ public final class ModBuildingBlocks {
                 ModBlockProperties.weatheredSandstone(), ModBlockProperties.deepWeatheredSandstone());
 
         WOOD_FAMILIES.add(woodFamily("scorched", "fire", SCORCHED_BLOCK_SET_TYPE, SCORCHED_WOOD_TYPE,
-                MapColor.COLOR_BROWN));
-        WOOD_FAMILIES.add(woodFamily("arid", "wind", ARID_BLOCK_SET_TYPE, ARID_WOOD_TYPE, MapColor.SAND));
+                MapColor.COLOR_BROWN, false));
+        WOOD_FAMILIES.add(woodFamily("arid", "wind", ARID_BLOCK_SET_TYPE, ARID_WOOD_TYPE, MapColor.SAND, true));
 
         LANTERNS.add(lanternSet("frost", MapColor.ICE));
         LANTERNS.add(lanternSet("blaze", MapColor.COLOR_ORANGE));

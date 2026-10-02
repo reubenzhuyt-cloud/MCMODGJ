@@ -3,6 +3,7 @@ package com.example.weather_realm;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.example.weather_realm.block.AridLogBlock;
 import com.example.weather_realm.block.AridSaplingBlock;
 import com.example.weather_realm.block.BiomePlantBlock;
 import com.example.weather_realm.block.FrostFlowerBlock;
@@ -428,9 +429,9 @@ public final class ModBlocks {
                     .pushReaction(PushReaction.DESTROY));
 
     // --- 风化木 / Arid wood (arid biome tree family) --------------------------------------------
-    public static final DeferredBlock<FrostLogBlock> ARID_LOG = BLOCKS.registerBlock("arid_log", FrostLogBlock::new, ModBlockProperties.aridWoodPillar());
-    public static final DeferredBlock<FrostLogBlock> ARID_WOOD = BLOCKS.registerBlock("arid_wood", FrostLogBlock::new, ModBlockProperties.aridWoodPillar());
-    public static final DeferredBlock<FrostLogBlock> STRIPPED_ARID_LOG = BLOCKS.registerBlock("stripped_arid_log", FrostLogBlock::new, ModBlockProperties.aridWoodPillar());
+    public static final DeferredBlock<AridLogBlock> ARID_LOG = BLOCKS.registerBlock("arid_log", AridLogBlock::new, ModBlockProperties.aridWoodPillar());
+    public static final DeferredBlock<AridLogBlock> ARID_WOOD = BLOCKS.registerBlock("arid_wood", AridLogBlock::new, ModBlockProperties.aridWoodPillar());
+    public static final DeferredBlock<AridLogBlock> STRIPPED_ARID_LOG = BLOCKS.registerBlock("stripped_arid_log", AridLogBlock::new, ModBlockProperties.aridWoodPillar());
 
     public static final DeferredBlock<FrostLeavesBlock> ARID_LEAVES = BLOCKS.registerBlock("arid_leaves", FrostLeavesBlock::new,
             BlockBehaviour.Properties.of()

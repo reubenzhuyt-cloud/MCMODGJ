@@ -77,8 +77,34 @@ public final class ModBlockProperties {
         return woodPillar(MapColor.COLOR_BROWN);
     }
 
+    /**
+     * 风化原木/木干 / Arid (weathered) log &amp; wood properties. The weathered sprites carry
+     * {@code alpha=0} erosion holes, so the block must not occlude its neighbours (otherwise the
+     * culled neighbour face shows through the holes). The light-blocking is restored by
+     * {@code AridLogBlock.getLightBlock}.
+     */
     public static BlockBehaviour.Properties aridWoodPillar() {
-        return woodPillar(MapColor.SAND);
+        return woodPillar(MapColor.SAND).noOcclusion();
+    }
+
+    /** Common planks recipe shared by every wood family: bass, 2.0 hardness, wood, flammable. */
+    public static BlockBehaviour.Properties woodPlanks(MapColor mapColor) {
+        return BlockBehaviour.Properties.of()
+                .mapColor(mapColor)
+                .instrument(NoteBlockInstrument.BASS)
+                .strength(2.0F, 3.0F)
+                .sound(SoundType.WOOD)
+                .ignitedByLava();
+    }
+
+    /**
+     * 风化木木板 / Arid (weathered) planks properties. Same as {@link #woodPlanks} plus
+     * {@code noOcclusion()}: the sprite carries {@code alpha=0} holes, so the block must not cull
+     * its neighbours' faces. {@code AridPlanksBlock.getLightBlock} restores the full-cube
+     * light blocking that {@code noOcclusion()} would otherwise drop to 1.
+     */
+    public static BlockBehaviour.Properties aridPlanks() {
+        return woodPlanks(MapColor.SAND).noOcclusion();
     }
 
     // --- Plants ---------------------------------------------------------------------------------
