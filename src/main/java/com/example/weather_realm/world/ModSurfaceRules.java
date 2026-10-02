@@ -38,6 +38,14 @@ import net.minecraft.world.level.levelgen.VerticalAnchor;
  * The full-column stone branches are intentionally <em>not</em> wrapped, so cave walls stay stone
  * and can still host ore veins.</p>
  *
+ * <p><b>Land-only topsoil</b>: {@code ON_FLOOR} alone would also skin the bottom of an ocean/lake
+ * (the floor under water still has at most one solid block above it). Vanilla keeps grass off
+ * submerged floors with {@code waterBlockCheck(0, 0)} (true when the column has no water or the
+ * block sits at/above the water surface), so the topsoil branch is wrapped in
+ * {@link #NOT_UNDERWATER} too. Under water the first layer therefore falls through to the stone
+ * gradient ({@link #SHALLOW_GRADIENT} / {@link #DEEP_GRADIENT}) instead of a grass/moss/turf
+ * block.</p>
+ *
  * <p>The remaining vertical guard is {@link #ABOVE_BEDROCK}: it keeps the vanilla bedrock floor
  * (which lives in the wrapped {@code original} rules) intact so the bottom of the world does not
  * turn into permafrost. Vanilla builds its bedrock floor from the bottom five layers, so our rules
@@ -79,6 +87,14 @@ public final class ModSurfaceRules {
 
     /** 浅层判定(DEEP_GRADIENT 的补集)/ Shallow stone; complement of {@link #DEEP_GRADIENT}. */
     private static final SurfaceRules.ConditionSource SHALLOW_GRADIENT = SurfaceRules.not(DEEP_GRADIENT);
+
+    /**
+     * 仅在陆地(非水下)/ True when the column has no water or the block is at/above the water
+     * surface. Exact same condition vanilla {@code SurfaceRuleData.overworld()} uses to keep
+     * {@code grass_block} off submerged floors ({@code waterBlockCheck(0, 0)}): while the block
+     * sits strictly below the water height the condition is false, so the topsoil rule is skipped.
+     */
+    private static final SurfaceRules.ConditionSource NOT_UNDERWATER = SurfaceRules.waterBlockCheck(0, 0);
 
     /**
      * Memoised {@code original -> prepended} rule trees, keyed by the identity of the incoming rule
@@ -148,10 +164,12 @@ public final class ModSurfaceRules {
         return SurfaceRules.ifTrue(ABOVE_BEDROCK,
                 SurfaceRules.ifTrue(SurfaceRules.isBiome(CRYSTAL_PLAINS),
                         SurfaceRules.sequence(
-                                // 表层草皮:仅在初步地表之上,避免洞口/山体内部地板被草皮覆盖
+                                // 表层霜苔:仅在初步地表之上且为陆地(非水下),避免洞口/山体内部
+                                // 地板与水底第一层被草皮覆盖
                                 SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
-                                        SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
-                                                SurfaceRules.state(ModBlocks.FROST_MOSS.get().defaultBlockState()))),
+                                        SurfaceRules.ifTrue(NOT_UNDERWATER,
+                                                SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+                                                        SurfaceRules.state(ModBlocks.FROST_MOSS.get().defaultBlockState())))),
                                 // 原版 deepslate 式噪声过渡(y ≤ 0 深层 / y ≥ 8 浅层,中间为噪声带)
                                 SurfaceRules.ifTrue(SHALLOW_GRADIENT,
                                         SurfaceRules.state(ModBlocks.PERMAFROST.get().defaultBlockState())),
@@ -168,10 +186,12 @@ public final class ModSurfaceRules {
         return SurfaceRules.ifTrue(ABOVE_BEDROCK,
                 SurfaceRules.ifTrue(SurfaceRules.isBiome(BLAZING_PLAINS),
                         SurfaceRules.sequence(
-                                // 表层火山灰:仅在初步地表之上,避免洞口/山体内部地板被覆盖
+                                // 表层火山灰:仅在初步地表之上且为陆地(非水下),避免洞口/山体内部
+                                // 地板与水底第一层被覆盖
                                 SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
-                                        SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
-                                                SurfaceRules.state(ModBlocks.VOLCANIC_ASH.get().defaultBlockState()))),
+                                        SurfaceRules.ifTrue(NOT_UNDERWATER,
+                                                SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+                                                        SurfaceRules.state(ModBlocks.VOLCANIC_ASH.get().defaultBlockState())))),
                                 // 原版 deepslate 式噪声过渡(y ≤ 0 深层 / y ≥ 8 浅层,中间为噪声带)
                                 SurfaceRules.ifTrue(SHALLOW_GRADIENT,
                                         SurfaceRules.state(ModBlocks.FIRE_STONE.get().defaultBlockState())),
@@ -188,10 +208,12 @@ public final class ModSurfaceRules {
         return SurfaceRules.ifTrue(ABOVE_BEDROCK,
                 SurfaceRules.ifTrue(SurfaceRules.isBiome(ARID_WASTELAND),
                         SurfaceRules.sequence(
-                                // 表层干草坪:仅在初步地表之上,避免洞口/山体内部地板被覆盖
+                                // 表层干草坪:仅在初步地表之上且为陆地(非水下),避免洞口/山体内部
+                                // 地板与水底第一层被覆盖
                                 SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
-                                        SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
-                                                SurfaceRules.state(ModBlocks.DRY_TURF.get().defaultBlockState()))),
+                                        SurfaceRules.ifTrue(NOT_UNDERWATER,
+                                                SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+                                                        SurfaceRules.state(ModBlocks.DRY_TURF.get().defaultBlockState())))),
                                 // 原版 deepslate 式噪声过渡(y ≤ 0 深层 / y ≥ 8 浅层,中间为噪声带)
                                 SurfaceRules.ifTrue(SHALLOW_GRADIENT,
                                         SurfaceRules.state(ModBlocks.WEATHERED_SANDSTONE.get().defaultBlockState())),
