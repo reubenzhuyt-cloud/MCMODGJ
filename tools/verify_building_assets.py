@@ -1149,21 +1149,68 @@ def sapling_model_problems(root: Path, modid: str):
     return problems, len(blockstates)
 
 
-# --- solid-cube transparency guard ---------------------------------------------------------
-# A full opaque cube (``cube_all`` / ``pillar``) occludes its neighbours, so the engine culls
-# the neighbour faces touching it. If such a block's texture has alpha=0 pixels and is drawn
-# cutout, you see straight through the hole to the culled neighbour (the void) -- e.g. the
-# arid wood holes punched in the previous round. Solid cubes therefore may NOT contain alpha=0
-# pixels, and must NOT declare cutout. Only genuinely non-occluding shapes may be transparent,
-# and those must carry an explicit cutout.
+# --- alpha / non-occluding guard ------------------------------------------------------------
+# A model that references a texture with alpha=0 pixels must be drawn cutout AND its block must
+# not occlude neighbour faces. An occluding full cube culls the touching neighbour face; with
+# alpha holes you would see straight through the hole to that culled face (the arid-wood
+# see-through regression). Fully opaque solid cubes must therefore stay fully opaque and must NOT
+# declare cutout.
+#
+# Ground truth for "does not occlude" is the Java registration: BlockBehaviour.Properties
+# .noOcclusion() clears canOcclude (BlockBehaviour.java:1165-1168) and .noCollission() clears it
+# too (1159-1162). Family ids are built by concatenation (``prefix + "_planks"``), so a literal id
+# regex cannot recover them; the concrete ids are therefore listed explicitly below. The list
+# cannot go stale silently: every entry must exist among the emitted specs, and the full-cube
+# weathered entries are additionally pinned to the Java props factories (aridWoodPillar /
+# aridPlanks) -- deleting a real .noOcclusion() makes this guard FAIL instead of silently passing.
 _SOLID_CUBE_SHAPES = frozenset({"cube_all", "pillar"})
-# Inherently transparent shapes whose vanilla-template models carry no render_type and rely on
-# the engine's default render layer (glass panes, chains, lanterns, glass blocks, doors with a
+# Inherently transparent shapes whose vanilla-template models carry no render_type and rely on the
+# engine's default render layer (glass panes, chains, lanterns, glass blocks, doors with a vanilla
 # glass window). They are NOT opaque cubes, so they cannot cause the void bug; exempt from the
-# "transparency => explicit cutout" rule so pre-existing hand-authored/vanilla-template models
-# keep working unchanged. NOTE: this is a deliberate, documented exemption -- everything else
-# (cross / leaves / cluster / spike and all derived solid shapes) IS enforced.
+# explicit-cutout rule so pre-existing hand-authored/vanilla-template models keep working
+# unchanged. NOTE: this is a deliberate, documented exemption -- everything else (cross / leaves /
+# cluster / spike and all derived solid shapes) IS enforced.
 _CUTOUT_EXEMPT_SHAPES = frozenset({"door", "pane", "chain", "lantern", "glass_block"})
+
+# Every block id whose emitted models reference at least one alpha=0 texture. All of them are
+# registered non-occluding (noOcclusion() or noCollission()); anything else with an alpha sprite
+# is rejected by the guard below. Concrete ids (dynamic family ids expanded).
+_ALPHA_ALLOWED_BLOCKS = frozenset({
+    # 风化木 / weathered (arid) wood -- restored alpha=0 holes, registered noOcclusion
+    "arid_bush", "arid_button", "arid_door", "arid_fence", "arid_fence_gate", "arid_leaves",
+    "arid_log", "arid_planks", "arid_pressure_plate", "arid_slab", "arid_stairs", "arid_trapdoor",
+    "arid_wood", "stripped_arid_log", "stripped_arid_wood",
+    # 火主题 / blaze theme: glass family, lantern, chain, eco cluster + spike, cross plants
+    "blaze_chain", "blaze_crystal_cluster", "blaze_glass", "blaze_glass_pane", "blaze_grate",
+    "blaze_lantern", "blaze_spike",
+    "cinder_bloom", "fire_flower", "flame_sprout",
+    # 冰主题 / frost theme
+    "frost_chain", "frost_crystal_cluster", "frost_glass", "frost_glass_pane", "frost_grate",
+    "frost_lantern", "frost_spike",
+    # 焦木门上半玻璃窗 + 树叶 / scorched door glass window + leaves
+    "scorched_door", "scorched_leaves",
+    # 风主题 / wind theme
+    "wind_chain", "wind_crystal_cluster", "wind_glass", "wind_glass_pane", "wind_grate",
+    "wind_lantern", "wind_spike", "wind_sprout",
+    # 风沙植被 / arid cross plants (wind variant)
+    "dune_flower",
+})
+
+# The weathered full cubes take their non-occlusion from these two ModBlockProperties factories:
+#   * aridWoodPillar()  -> arid_log / arid_wood / stripped_arid_log / stripped_arid_wood
+#   * aridPlanks()      -> arid_planks (+ stairs/slab/fence/fence_gate via ofFullCopy)
+# Pinning the guard to the factory bodies means the "holes + occluding cube" regression cannot
+# pass just because the id is still listed.
+_ALPHA_JAVA_EVIDENCE = (
+    ("ModBlockProperties.java",
+     re.compile(r"aridWoodPillar\s*\([^)]*\)\s*\{[^}]*\.noOcclusion\s*\(", re.DOTALL),
+     "ModBlockProperties.aridWoodPillar() 缺少 noOcclusion()：arid 原木/木干会遮挡邻面，"
+     "镂空贴图将透视"),
+    ("ModBlockProperties.java",
+     re.compile(r"aridPlanks\s*\([^)]*\)\s*\{[^}]*\.noOcclusion\s*\(", re.DOTALL),
+     "ModBlockProperties.aridPlanks() 缺少 noOcclusion()：arid 木板（及其 stairs/slab/fence/"
+     "fence_gate 全拷贝派生）会遮挡邻面，镂空贴图将透视"),
+)
 
 
 def _all_asset_specs() -> list:
@@ -1175,8 +1222,20 @@ def _all_asset_specs() -> list:
     return specs
 
 
+def _transparent_java_problems(root: Path) -> list:
+    """Java evidence that the weathered cube families really are non-occluding."""
+    problems: list = []
+    for fname, regex, detail in _ALPHA_JAVA_EVIDENCE:
+        if not regex.search(_read(root / JAVA_REL / fname)):
+            problems.append(f"{fname}: {detail}")
+    return problems
+
+
 def alpha_guard_problems(root: Path, modid: str):
-    """Solid cubes opaque + transparency paired with cutout. Returns ``(problems, summary)``."""
+    """Transparency => non-occluding block + cutout; opaque cubes stay opaque.
+
+    Returns ``(problems, summary)``.
+    """
     if Image is None:
         raise ParseError("实心立方 alpha 门禁需要 Pillow（pip install Pillow）")
     assets = root / ASSETS_REL / modid
@@ -1197,10 +1256,13 @@ def alpha_guard_problems(root: Path, modid: str):
         return count
 
     problems: list = []
+    seen_ids: set = set()
     solid_checked = 0
     transparent_checked = 0
+    occludable_transparent = 0
     for spec in _all_asset_specs():
         name = spec["name"]
+        seen_ids.add(name)
         shape = real_shape(spec)
         suffixes = _BLOCK_MODEL_SUFFIXES.get(shape)
         if suffixes is None:  # unknown shapes are already a hard failure via check_known_shapes
@@ -1218,27 +1280,42 @@ def alpha_guard_problems(root: Path, modid: str):
             transparent = any(c for c in counts.values() if c)
             if is_solid:
                 solid_checked += 1
-                for tex, count in counts.items():
-                    if count:
-                        problems.append(
-                            f"{_rel(root, model_path)}: 实心不透明立方体引用了含 {count} 个 "
-                            f"alpha=0 像素的 {tex}.png -> 邻面被剔除会透视；请去掉洞")
-                if render_type is not None:
-                    problems.append(
-                        f"{_rel(root, model_path)}: 实心不透明立方体声明了 "
-                        f"render_type={render_type!r}（不透明贴图无需 cutout）；请移除")
-            else:
+            if transparent:
                 transparent_checked += 1
-                if shape in _CUTOUT_EXEMPT_SHAPES:
+                if name not in _ALPHA_ALLOWED_BLOCKS:
+                    occludable_transparent += 1
+                    problems.append(
+                        f"{_rel(root, model_path)}: 引用含 alpha=0 的贴图 {tex_ids}，但方块 "
+                        f"{name} 不在非遮挡允许清单（noOcclusion/noCollission）内 "
+                        f"-> 邻面被剔除会透视")
                     continue
-                if transparent and render_type != "minecraft:cutout":
+                if shape not in _CUTOUT_EXEMPT_SHAPES and render_type != "minecraft:cutout":
                     problems.append(
                         f"{_rel(root, model_path)}: 引用含 alpha=0 的贴图 {tex_ids} "
                         f"但 render_type != minecraft:cutout")
+            else:
+                if is_solid and render_type is not None:
+                    # Fully opaque solid cube that still declares cutout -> stray cutout.
+                    problems.append(
+                        f"{_rel(root, model_path)}: 实心不透明立方体声明了 "
+                        f"render_type={render_type!r}（不透明贴图无需 cutout）；请移除")
+                if not is_solid:
+                    # Non-solid model with no alpha: still part of the transparency surface
+                    # (matches the previous round's counter so the count cannot drop).
+                    transparent_checked += 1
+
+    stale = sorted(_ALPHA_ALLOWED_BLOCKS - seen_ids)
+    if stale:
+        problems.append("允许清单 _ALPHA_ALLOWED_BLOCKS 含陈旧项（已无对应方块资源）: "
+                        + ", ".join(stale))
+    problems.extend(_transparent_java_problems(root))
+
     if solid_checked == 0:
         raise ParseError("实心立方 alpha 门禁解析到 0 个模型（数据表结构变了？）")
+    if transparent_checked == 0:
+        raise ParseError("alpha 门禁解析到 0 个含 alpha=0 的模型（贴图/数据表结构变了？）")
     summary = {"solid_checked": solid_checked, "transparent_checked": transparent_checked,
-               "over": len(problems)}
+               "occludable_transparent": occludable_transparent, "over": len(problems)}
     return problems, summary
 
 
@@ -1330,9 +1407,10 @@ def main() -> None:
           f"{len(function_cond_diffs)} illegal")
     print(f"[build] sapling model : cross + cutout "
           f"({saplings_checked} checked, {len(sapling_model_diffs)} over)")
-    print(f"[build] alpha guard  : solid-cube opaque + transparency cutout "
+    print(f"[build] alpha guard  : transparency => non-occluding + cutout "
           f"({alpha_summary['solid_checked']} solid checked, "
           f"{alpha_summary['transparent_checked']} transparent checked, "
+          f"{alpha_summary['occludable_transparent']} occludable, "
           f"{alpha_summary['over']} over)")
 
     problems = []
@@ -1372,7 +1450,8 @@ def main() -> None:
         problems.append(("树苗模型错误", "sapling block model not cross+cutout",
                          sapling_model_diffs))
     if alpha_diffs:
-        problems.append(("实心立方透明像素/多余 cutout", "solid cube alpha or stray cutout",
+        problems.append(("透明贴图/遮挡方块/多余 cutout",
+                         "transparent texture on occluding block, missing cutout, or stray cutout",
                          alpha_diffs))
 
     if problems:
