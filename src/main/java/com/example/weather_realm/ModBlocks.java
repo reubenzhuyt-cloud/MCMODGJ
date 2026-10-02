@@ -9,6 +9,7 @@ import com.example.weather_realm.block.FrostFlowerBlock;
 import com.example.weather_realm.block.FrostGrassBlock;
 import com.example.weather_realm.block.FrostLeavesBlock;
 import com.example.weather_realm.block.FrostLogBlock;
+import com.example.weather_realm.block.FrostRaspberryBushBlock;
 import com.example.weather_realm.block.FrostSaplingBlock;
 import com.example.weather_realm.block.FrostSproutBlock;
 import com.example.weather_realm.block.GlacierBloomBlock;
@@ -121,6 +122,15 @@ public final class ModBlocks {
                     .instabreak()
                     .sound(SoundType.GRASS)
                     .offsetType(BlockBehaviour.OffsetType.XZ)
+                    .pushReaction(PushReaction.DESTROY));
+
+    // 冰树莓丛 / Frost Raspberry Bush - sweet-berry bush behaviour, drops frost raspberries.
+    public static final DeferredBlock<FrostRaspberryBushBlock> FROST_RASPBERRY_BUSH = BLOCKS.registerBlock("frost_raspberry_bush", FrostRaspberryBushBlock::new,
+            BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.PLANT)
+                    .randomTicks()
+                    .noCollission()
+                    .sound(SoundType.SWEET_BERRY_BUSH)
                     .pushReaction(PushReaction.DESTROY));
 
     // 坚冰原木 / Glacial Log
