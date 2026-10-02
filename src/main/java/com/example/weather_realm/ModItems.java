@@ -20,6 +20,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.DoubleHighBlockItem;
 import net.minecraft.world.item.HoeItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemNameBlockItem;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.MilkBucketItem;
 import net.minecraft.world.item.PickaxeItem;
@@ -188,9 +189,12 @@ public final class ModItems {
             new Item.Properties().food(new FoodProperties.Builder().nutrition(8).saturationModifier(0.8F).build()));
     public static final DeferredItem<Item> FROST_PELT = ITEMS.registerSimpleItem("frost_pelt");
 
-    // 冰树莓 / Frost Raspberry - a frosty berry snack matching vanilla sweet berries.
-    public static final DeferredItem<Item> FROST_RASPBERRY = ITEMS.registerSimpleItem("frost_raspberry",
-            new Item.Properties().food(new FoodProperties.Builder().nutrition(2).saturationModifier(0.2F).build()));
+    // 冰树莓 / Frost Raspberry - a frosty berry snack matching vanilla sweet berries. Also a seed:
+    // right-clicking a plantable block plants a frost raspberry bush (vanilla sweet_berries uses
+    // ItemNameBlockItem; MC 1.21.1 has no AliasedBlockItem).
+    public static final DeferredItem<ItemNameBlockItem> FROST_RASPBERRY = ITEMS.register("frost_raspberry",
+            () -> new ItemNameBlockItem(ModBlocks.FROST_RASPBERRY_BUSH.get(),
+                    new Item.Properties().food(new FoodProperties.Builder().nutrition(2).saturationModifier(0.2F).build())));
 
     // 冰牛奶桶 / Frost Milk Bucket - obtained by milking a frost cow with an empty bucket.
     public static final DeferredItem<MilkBucketItem> FROST_MILK_BUCKET = ITEMS.register("frost_milk_bucket",
