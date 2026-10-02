@@ -113,7 +113,7 @@
 | 地表 | 顶层雪 / 浮冰 / 冰 / 细雪 / 砂砾，基底 y ≥ 8 `permafrost` → y ≤ 0 `deep_permafrost`（中间为原版 deepslate 式逐块噪声过渡） | `world/ModSurfaceRules.java` |
 | 生物 | 冰原羊 / 冰原牛 / 冰原猪 / 冰原猫 | 同上 `spawners` |
 | 专属矿 | 冻土暴风雪结晶矿（浅/深）→ `blizzard_crystal` | `placed_feature/ore_permafrost_blizzard_crystal.json` |
-| 植被 | 坚冰木、冰晶花、冰雪草、冰川兰、霜草幼芽、高霜草/高霜冻花、**冰树莓丛（成片生成，`rarity_filter` chance=48）**、晶冰斑块（霜系地被只长在 `frost_moss`/雪/细雪上，**不长在冰上**） | `placed_feature/{frost_tree,frost_flower,frost_raspberry_bush,...}.json` |
+| 植被 | 坚冰木、冰晶花、冰雪草、冰川兰、霜草幼芽、高霜草/高霜冻花、**冰树莓丛（当前为诊断密度：`count` 14，每区块必刷，自然密度配方见 §7.4）**、晶冰斑块（霜系地被只长在 `frost_moss`/雪/细雪上，**不长在冰上**）；除冰树莓丛外，霜系植被密度已降为原 **1/3** | `placed_feature/{frost_tree,frost_flower,frost_raspberry_bush,...}.json` |
 | 天气表现 | **永久暴风雪**（仅此群系），带 1.25 s 跨群系淡入淡出 | `client/ClientBlizzardEffects.java` |
 | 专属音乐 | 「水晶平原」`unyielding_icy_wind` | `sounds.json` + `sounds/music/unyielding_icy_wind.ogg` |
 
@@ -277,7 +277,9 @@
 - 风沙：沙丘花、风生草、风沙灌木、风化树苗。
 - 证据：`lang/zh_cn.json`、`placed_feature/` 下对应 JSON。
 - **霜系植被可种地面**：`frost_plantable_on` = `minecraft:snow_block` / `minecraft:powder_snow` / `weather_realm:frost_moss`；**冰（`ice` / `packed_ice` / `blue_ice`）已移除**——霜系地被不再生成在冰面，玩家也不能再手动种在冰上（与「冰不长草」一致）。门禁 `tools/verify_worldgen.py` 冰面守卫。
-- **地被密度**：风沙（`dune_flower` / `wind_sprout` / `arid_bush`）与燃焰（`cinder_bloom` / `flame_sprout` / `fire_flower`）两群系地被已降为原 **1/4**（`rarity_filter` 乘性抽稀，精确无取整误差）；树（`arid_tree` / `scorched_tree`）与霜系植被密度不变。
+- **地被密度**：风沙（`dune_flower` / `wind_sprout` / `arid_bush`）与燃焰（`cinder_bloom` / `flame_sprout` / `fire_flower`）两群系地被已降为原 **1/4**（`rarity_filter` 乘性抽稀，精确无取整误差）；树（`arid_tree` / `scorched_tree`）不变。
+- **霜系植被密度（2026-10-02）**：`crystal_plains` 的 `frost_tree` / `frost_grass` / `frost_flower` / `frost_sprout` / `glacier_bloom` / `tall_frost_grass` / `tall_frost_flower` 已降为原 **1/3**（`count` 取整 ÷3 或 `rarity_filter.chance` ×3；`frost_grass`/`frost_sprout` 因取整实际为 3/8 ≈ 0.375，其余为精确 1/3）。
+- **冰树莓丛（`frost_raspberry_bush`）当前为诊断密度（每区块必刷）**：`placed_feature` 用 `count 14` + `in_square` + `heightmap MOTION_BLOCKING` + `biome`，`configured_feature` 内层 `random_patch tries=1 / xz_spread=1 / y_spread=0`（每个成功尝试最多放 **1** 个丛），概率模型 `P(区块≥1)=1-(1-P_bare)^14`（P_bare=0.3→99.32%、0.7→≈100%）。**观测确认可见后回落自然密度配方**：`placed_feature` = `rarity_filter chance=48` + `in_square` + `heightmap MOTION_BLOCKING` + `biome`，`configured_feature` = `random_patch tries=96 / xz_spread=7 / y_spread=3`。（根因：`MOTION_BLOCKING` 忽略不挡运动的植物，故只落在未被同类植被占据的裸列上；再叠加原 `rarity 48` 极难见到。）
 - **生效范围**：worldgen 改动需**退出到主界面重进存档**，且只对**新区块**生效。
 
 ### 7.5 生物
