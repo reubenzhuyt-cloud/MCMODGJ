@@ -333,23 +333,24 @@ def block_specs(theme):
 
     wn = bd.wood_block_names(theme)
     wsrc = theme["wood_src"]
-    # Wood pillars are opaque cubes: their textures must stay fully opaque, so no cutout.
+    # Weathered wood punches alpha=0 holes, so its pillar models must be cutout.
+    wood_cutout = bool(theme["wood_profile"].get("weather"))
     specs.append(dict(
         name=wn["log"], model="pillar", en=theme["wood_names_en"]["log"], zh=theme["wood_names_zh"]["log"],
-        loot=("self",),
+        loot=("self",), cutout=wood_cutout,
         textures=[(f"{theme['wood']}_log", f"block/{wsrc}_log", theme["wood_profile"]),
                   (f"{theme['wood']}_log_top", f"block/{wsrc}_log_top", theme["wood_profile"])],
         pillar_top=f"{theme['wood']}_log_top", pillar_side=f"{theme['wood']}_log",
     ))
     specs.append(dict(
         name=wn["wood"], model="pillar", en=theme["wood_names_en"]["wood"], zh=theme["wood_names_zh"]["wood"],
-        loot=("self",),
+        loot=("self",), cutout=wood_cutout,
         textures=[(f"{theme['wood']}_log", f"block/{wsrc}_log", theme["wood_profile"])],
         pillar_top=f"{theme['wood']}_log", pillar_side=f"{theme['wood']}_log",
     ))
     specs.append(dict(
         name=wn["stripped_log"], model="pillar", en=theme["wood_names_en"]["stripped_log"],
-        zh=theme["wood_names_zh"]["stripped_log"], loot=("self",),
+        zh=theme["wood_names_zh"]["stripped_log"], loot=("self",), cutout=wood_cutout,
         textures=[(f"stripped_{theme['wood']}_log", f"block/stripped_{wsrc}_log", theme["wood_profile"]),
                   (f"stripped_{theme['wood']}_log_top", f"block/stripped_{wsrc}_log_top", theme["wood_profile"])],
         pillar_top=f"stripped_{theme['wood']}_log_top", pillar_side=f"stripped_{theme['wood']}_log",

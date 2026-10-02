@@ -1,5 +1,6 @@
 {
   "parent": "minecraft:block/cube_column",
+  "render_type": "minecraft:cutout",
   "textures": {
     "end": "weather_realm:block/arid_log_top",
     "side": "weather_realm:block/arid_log"
