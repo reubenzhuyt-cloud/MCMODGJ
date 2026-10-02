@@ -75,7 +75,8 @@
       "weather_realm:frost_sprout",
       "weather_realm:glacier_bloom",
       "weather_realm:tall_frost_grass",
-      "weather_realm:tall_frost_flower"
+      "weather_realm:tall_frost_flower",
+      "weather_realm:frost_raspberry_bush"
     ],
     [
       "minecraft:freeze_top_layer"
