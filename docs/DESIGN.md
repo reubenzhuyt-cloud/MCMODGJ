@@ -113,7 +113,7 @@
 | 地表 | 顶层雪 / 浮冰 / 冰 / 细雪 / 砂砾，基底 y ≥ 8 `permafrost` → y ≤ 0 `deep_permafrost`（中间为原版 deepslate 式逐块噪声过渡） | `world/ModSurfaceRules.java` |
 | 生物 | 冰原羊 / 冰原牛 / 冰原猪 / 冰原猫 | 同上 `spawners` |
 | 专属矿 | 冻土暴风雪结晶矿（浅/深）→ `blizzard_crystal` | `placed_feature/ore_permafrost_blizzard_crystal.json` |
-| 植被 | 坚冰木、冰晶花、冰雪草、冰川兰、霜草幼芽、高霜草/高霜冻花、晶冰斑块（霜系地被只长在 `frost_moss`/雪/细雪上，**不长在冰上**） | `placed_feature/{frost_tree,frost_flower,...}.json` |
+| 植被 | 坚冰木、冰晶花、冰雪草、冰川兰、霜草幼芽、高霜草/高霜冻花、**冰树莓丛（成片生成，`rarity_filter` chance=48）**、晶冰斑块（霜系地被只长在 `frost_moss`/雪/细雪上，**不长在冰上**） | `placed_feature/{frost_tree,frost_flower,frost_raspberry_bush,...}.json` |
 | 天气表现 | **永久暴风雪**（仅此群系），带 1.25 s 跨群系淡入淡出 | `client/ClientBlizzardEffects.java` |
 | 专属音乐 | 「水晶平原」`unyielding_icy_wind` | `sounds.json` + `sounds/music/unyielding_icy_wind.ogg` |
 

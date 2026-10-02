@@ -889,6 +889,56 @@ def write_sapling_assets(root: Path) -> int:
     return len(SAPLING_SPECS)
 
 
+# --- frost raspberry bush ----------------------------------------------------
+# ``frost_raspberry_bush`` is an age-0..3 sweet-berry clone, so its four stage sprites are
+# derived from the vanilla sweet-berry sprites: the alpha channel is carried through
+# byte-for-byte (identical silhouette / cutout) and only RGB is remapped -- stems/leaves to
+# the frost-plant cyan palette, red berries to pale ice-blue fruit. Pure function of the
+# source pixels, so re-running the generator is byte-for-byte idempotent.
+FROST_BUSH_NAME = "frost_raspberry_bush"
+FROST_BUSH_SOURCES = (
+    "sweet_berry_bush_stage0", "sweet_berry_bush_stage1",
+    "sweet_berry_bush_stage2", "sweet_berry_bush_stage3",
+)
+
+
+def recolor_frost_bush(img: Image.Image) -> Image.Image:
+    """Deterministic foliage/berry recolor that never touches the alpha channel."""
+    out = img.copy().convert("RGBA")
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+            berry = s > 0.30 and (h < 0.12 or h > 0.88)
+            if berry:
+                # Red fruit -> pale ice-blue berries; keep the highlight shading.
+                h = 0.55
+                s = min(1.0, 0.30 + s * 0.55)
+                v = min(1.0, 0.45 + v * 0.55)
+            else:
+                # Green stems / leaves -> frost-plant cyan, lifted into the bright frost range.
+                h = 0.52 + (h - 0.37) * 0.25
+                s = min(1.0, s * 0.95)
+                v = min(1.0, 0.30 + v * 1.05)
+            nr, ng, nb = colorsys.hsv_to_rgb(h, s, v)
+            px[x, y] = (round(nr * 255), round(ng * 255), round(nb * 255), a)
+    return out
+
+
+def write_frost_raspberry_bush_assets(root: Path) -> int:
+    """Derive the four frost-bush stage textures from the vanilla sprites."""
+    out_dir = root / "src/main/resources/assets" / MODID / "textures/block"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for stage, source in enumerate(FROST_BUSH_SOURCES):
+        with ZIP.open(f"assets/minecraft/textures/block/{source}.png") as fh:
+            img = Image.open(io.BytesIO(fh.read())).convert("RGBA")
+        recolor_frost_bush(img).save(out_dir / f"{FROST_BUSH_NAME}_stage{stage}.png")
+    return len(FROST_BUSH_SOURCES)
+
+
 # --- entry point -------------------------------------------------------------
 def collect_building_specs():
     """Expand ``bd.BUILDING_FAMILIES`` into concrete block specs.
@@ -946,6 +996,8 @@ def run(root: Path) -> None:
     print(f"[gen] wrote {len(recipes)} building recipes")
     saplings = write_sapling_assets(root)
     print(f"[gen] wrote {saplings} themed saplings")
+    bushes = write_frost_raspberry_bush_assets(root)
+    print(f"[gen] wrote {bushes} frost raspberry bush stage textures")
     ZIP.close()
     print(f"[gen] wrote textures + resources for {total} blocks "
           f"({2 * total} block textures) under {root}")
