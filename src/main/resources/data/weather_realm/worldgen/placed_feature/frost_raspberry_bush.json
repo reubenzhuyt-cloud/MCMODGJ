@@ -2,8 +2,8 @@
   "feature": "weather_realm:frost_raspberry_bush",
   "placement": [
     {
-      "type": "minecraft:count",
-      "count": 14
+      "type": "minecraft:rarity_filter",
+      "chance": 12
     },
     {
       "type": "minecraft:in_square"

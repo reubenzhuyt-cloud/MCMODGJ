@@ -489,7 +489,7 @@ lang 亦为 dict.update merge（`:663-667`），不覆盖手写键。
 7. **退出到主界面 → 重进存档**（动态注册表，`/reload` 无效）。
 8. 注意红线：`BiomeModifier` **不能**向主世界注入新群系（`AGENTS.md` §7）；不要自研 noise/density function。
 
-> **`crystal_plains` 植被密度现状（2026-10-02）**：霜系植被（`frost_tree` / `frost_grass` / `frost_flower` / `frost_sprout` / `glacier_bloom` / `tall_frost_grass` / `tall_frost_flower`）已降为原 **1/3**；其中 **冰树莓丛当前为诊断密度（`count 14`，每区块必刷，内层 `tries=1`）**，自然密度配方（`rarity_filter chance=48` + `random_patch tries=96/xz7/y3`）见 `docs/DESIGN.md` §7.4。placed/configured_feature 改动需**退出到主界面重进存档**、仅对新区块生效。
+> **`crystal_plains` 植被密度现状（2026-10-02）**：霜系植被（`frost_tree` / `frost_grass` / `frost_flower` / `frost_sprout` / `glacier_bloom` / `tall_frost_grass` / `tall_frost_flower`）已降为原 **1/3**；**冰树莓丛为自然密度（`rarity_filter chance 12` + `random_patch tries 12/xz5/y2`，期望 ≈0.8 丛/区块，约每 12 区块一小群；诊断配方 `count 14` + `tries 1/xz1/y0` 留档）**，详见 `docs/DESIGN.md` §7.4。placed/configured_feature 改动需**退出到主界面重进存档**、仅对新区块生效。
 
 ### 10.3 新增一个网络包
 1. 新建 `record XxxPayload(...) implements CustomPacketPayload`，声明 `Type`（`ResourceLocation.fromNamespaceAndPath(WeatherRealm.MODID, "...")`）与 `StreamCodec`（参考 `SetWeatherPayload.java`）。
