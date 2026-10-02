@@ -144,7 +144,7 @@
 ### 3.4 表层过渡方块 🟡
 
 - `frost_moss`（耐寒苔藓）、`dry_turf`（干草坪）、`volcanic_ash`（火山灰）已注册并进创造标签与模型，证据：`lang/zh_cn.json`、`ModBlocks.java`。
-- 世界生成期由 `world/ModSurfaceRules.java` 经 `SurfaceSystemMixin` **直接作为三群系顶层草皮铺设**（`ModSurfaceRules.java:152-154`/`172-174`/`192-194` 的 `abovePreliminarySurface` + `ON_FLOOR` 分支），不依赖 `placed_feature`，已确认生效。
+- 世界生成期由 `world/ModSurfaceRules.java` 经 `SurfaceSystemMixin` **直接作为三群系顶层草皮铺设**（`ModSurfaceRules.java` 三个群系规则里的 `abovePreliminarySurface` + `waterBlockCheck(0,0)` + `ON_FLOOR` 分支），不依赖 `placed_feature`，已确认生效。**仅在陆地生效**：`waterBlockCheck(0,0)` 为假（水下）时不铺草皮，水底第一层保留 `PERMAFROST`/`FIRE_STONE`/`WEATHERED_SANDSTONE` 石质。
 - **深浅岩分界**已从 y=0 硬切改为**原版 deepslate 式噪声过渡**：`SurfaceRules.verticalGradient("deepslate", absolute(0), absolute(8))`，即 **y ≤ 0 深层 / y ≥ 8 浅层，中间为逐块噪声带**（`ModSurfaceRules.java:77-81`）。
 
 ---
@@ -427,7 +427,7 @@
 
 **已复核（本轮据代码确认，从原「不确定」移出）：**
 
-3. **`frost_moss` / `dry_turf` / `volcanic_ash` 参与世界生成**：✅ 已确认。由 `world/ModSurfaceRules.java` 经 `SurfaceSystemMixin` 作为三群系顶层草皮铺设（不依赖 `placed_feature`）。
+3. **`frost_moss` / `dry_turf` / `volcanic_ash` 参与世界生成**：✅ 已确认。由 `world/ModSurfaceRules.java` 经 `SurfaceSystemMixin` 作为三群系顶层草皮铺设（不依赖 `placed_feature`）；仅陆地（`waterBlockCheck(0,0)` 为真）铺草皮，水下保留石质。
 4. ~~**极域天象图探索进度是否持久化**~~：**已作废**。探索/迷雾机制整体移除（`BiomeMapExplorationState` 已删除），地图改为**服务端噪声采样、范围内全图即时染色**，不再有「探索进度」概念；证据 `map/BiomeMapServerSampler.java`、`client/map/BiomeMapClientData.java:100-115`。
 5. **`weather_altar_core` 的 BER 双层模型是否启用**：✅ 已确认启用。`client/ClientBlockEntityRenderers.java:22` 注册 BER，`:26-28` 通过 `ModelEvent.RegisterAdditional` 加载 shell/inner 两个独立模型。
 6. **模板残留 `Config.java`**：✅ 已删除，替换为 `config/WeatherRealmConfig.java`；其 COMMON/CLIENT 项分别被 `ModNetwork`、`WeatherPortalBlock`、`ClimatePortalHandler` 与 `ClientBlizzardEffects` 读取。
